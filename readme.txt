@@ -1,6 +1,6 @@
-=== Ligase ===
+=== Ligase — Schema Markup for Blogs ===
 Contributors: marcinzmuda
-Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
+Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org, entity graph
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
@@ -8,141 +8,98 @@ Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Schema.org JSON-LD markup for WordPress blogs. Article, Person, Organization, BreadcrumbList, FAQPage, HowTo, VideoObject — with AI Search Readiness scoring.
+Complete schema.org JSON-LD for WordPress blogs — entity graph, AI Search Readiness Score, and schema auditor in one plugin.
 
 == Description ==
 
-Ligase automatically generates complete schema.org JSON-LD markup for your WordPress blog, optimized for both Google Rich Results and AI search engines (Google AI Overviews, ChatGPT, Perplexity).
+Ligase automatically generates complete, linked schema.org JSON-LD markup for your WordPress blog — optimized for both Google Rich Results and AI search engines (Google AI Overviews, ChatGPT, Perplexity).
 
-**Key Features:**
+Unlike basic SEO plugins that output disconnected schema blocks, Ligase builds a full entity graph: your BlogPosting links to a Person, who links to an Organization, all connected through @id references. This is what Google's AI Mode uses to verify who you are and whether to cite you.
 
-* **Complete @graph schema** — Article/BlogPosting, Person, Organization, WebSite, BreadcrumbList in a single linked JSON-LD block
-* **AI Search Readiness Score** — 0-100 score showing how ready your site is for AI citation
-* **E-E-A-T Author Scoring** — Per-author expertise scores with actionable recommendations
-* **Schema Auditor** — Scan, supplement, or replace weak schema from other plugins (Yoast, Rank Math, AIOSEO)
-* **Entity Detection** — 4-level pipeline: WordPress native → content structure → NER → Wikidata lookup
-* **sameAs + Wikidata** — Link your blog and authors to Wikidata for entity disambiguation
-* **knowsAbout** — Declare expertise topics for Organization and Person entities
-* **Auto YouTube detection** — Generates VideoObject schema from embedded YouTube videos
-* **FAQ & HowTo blocks** — Gutenberg blocks with automatic schema generation
-* **Google Schema Changelog** — Stay informed about Google's rich result changes
-* **Import/Export** — Migrate settings between sites or from other SEO plugins
+**What makes Ligase different:**
 
-**Supported Schema Types:**
+* **AI Search Readiness Score** — a 0–100 score showing exactly how ready your blog is to be cited by AI engines, with specific recommendations
+* **Schema Auditor** — scans schema already on your pages (from Yoast, your theme, or other plugins), scores it, and replaces or supplements weak markup automatically
+* **Wikidata entity linking** — connect your blog and authors to Wikidata — the strongest identity signal for Google Knowledge Graph post-March 2026
+* **knowsAbout** — declare topical expertise for your Organization and authors, directly influencing AI citation authority
+* **16 schema types** — including QAPage, ClaimReview, DefinedTerm, Speakable, AudioObject, Course, and Event
 
-* Article / BlogPosting / NewsArticle
-* Person (with E-E-A-T signals)
-* Organization (with logo, sameAs, knowsAbout)
-* WebSite (with SearchAction)
-* BreadcrumbList
-* FAQPage
-* HowTo
-* VideoObject
-* Review
-* QAPage
-* ClaimReview
-* DefinedTermSet
-* SoftwareApplication
-* AudioObject
-* Course
-* Event
+**Supported schema types:**
+
+Article / BlogPosting / NewsArticle · Person · Organization · WebSite · BreadcrumbList · FAQPage · HowTo · VideoObject · Review · QAPage · ClaimReview · DefinedTerm · AudioObject · SoftwareApplication · Course · Event
+
+**Works alongside or instead of Yoast, Rank Math, and AIOSEO.**
+Default mode detects active SEO plugins and avoids duplicate output. Standalone mode suppresses their schema and takes full control.
 
 == Installation ==
 
-1. Upload the `ligase` folder to `/wp-content/plugins/`
-2. Activate the plugin through the 'Plugins' menu in WordPress
-3. Go to **Ligase → Ustawienia** to configure your organization details
-4. Add author profiles with LinkedIn, Wikidata links for E-E-A-T signals
+1. Download the latest `ligase.zip` from the [GitHub Releases](https://github.com/marcinzmuda/ligase/releases) page
+2. In WordPress: go to **Plugins → Add New → Upload Plugin**
+3. Select the zip file and click **Install Now**
+4. Activate the plugin
+
+= After activation =
+
+1. Go to **Ligase → Settings**
+2. Enter your organization name, logo URL, and email
+3. Add social media links (especially Wikidata — it's the strongest entity signal)
+4. Edit author profiles — add job title, expertise areas, and profile links
+5. Check your AI Search Readiness Score at **Ligase → Dashboard**
 
 == Frequently Asked Questions ==
 
 = Does Ligase work alongside Yoast SEO? =
-Yes. In default mode, Ligase detects Yoast and skips output to avoid duplicates. Enable Standalone Mode to suppress Yoast schema and use Ligase exclusively.
 
-= Does Ligase work with Rank Math and All in One SEO? =
-Yes. The same conflict detection applies to Rank Math, AIOSEO, SEOPress, The SEO Framework, and Slim SEO. In default mode Ligase defers to them; in Standalone Mode it replaces their output.
+Yes. In default mode, Ligase detects Yoast and skips its own output to avoid duplicates. Enable Standalone Mode in Settings to suppress Yoast schema and use Ligase exclusively.
 
-= Can I import settings from Yoast or Rank Math? =
-Yes. Go to Ligase > Narzedzia > Import z wtyczek SEO. One click imports organization name, logo, and social links.
+= Will my schema data be lost if I deactivate the plugin? =
+
+No. Your settings and post meta are preserved on deactivation. Data is only removed when you uninstall (delete) the plugin.
 
 = What is the AI Search Readiness Score? =
-A 0-100 score measuring how well your site's schema supports citation by AI search engines like Google AI Overviews, ChatGPT, and Perplexity. Higher scores mean better entity linking, sameAs verification, and content structure.
 
-= Does FAQPage schema still work? =
-Google restricted FAQPage rich results to gov/health sites in 2024, but the schema still provides semantic value for AI Overviews and Bing Copilot.
+It's a 0–100 score that measures how well your blog is set up to be cited by AI engines like Google AI Overviews, ChatGPT, and Perplexity. It checks entity graph completeness, Wikidata links, image quality, author profiles, and more.
 
-= Will schema be lost if I deactivate the plugin? =
-Your settings and post meta are preserved on deactivation. Only uninstalling removes all data.
+= Do FAQPage and HowTo still work? =
 
-= Does Ligase support WPML or Polylang? =
-Yes. Ligase auto-detects WPML and Polylang, sets correct inLanguage per translation, and adds sameAs links between translated versions.
+The schema is generated and has real value for AI search and voice search. However, Google removed rich result display for HowTo (2024) and restricted FAQPage to government/health sites (2024). Ligase shows this information directly in the metabox so you know what to expect.
 
-= How does the Google Search Console integration work? =
-Ligase uses a Service Account (no OAuth redirect). Create a Service Account in Google Cloud Console, add it to GSC, and paste the JSON key into the Ligase dashboard.
+= Does Ligase support multiple languages? =
+
+Yes. Ligase detects WPML and Polylang and automatically sets the correct `inLanguage` for each post. sameAs links are synchronized across translations.
 
 == Screenshots ==
 
-1. Dashboard with AI Search Readiness Score and schema coverage stats
-2. Schema Auditor scanning existing markup from other plugins
-3. Post editor with Schema Markup metabox and type toggles
-4. Posts list with per-post schema score and quick actions
-5. Entity management with E-E-A-T author scores
-6. Tools page with SEO plugin importer and schema validator
-7. Gutenberg sidebar panel with live schema validation
-8. Google Search Console rich results dashboard
+1. Dashboard — AI Search Readiness Score with actionable recommendations
+2. Schema Auditor — scanning and replacing weak markup from other plugins
+3. Post editor — Schema Markup metabox with type selector and toggles
+4. Settings — Organization data, Wikidata linking, social profiles
+5. Entities — Wikidata search and author E-E-A-T scores
 
 == Changelog ==
 
 = 2.0.0 =
-* Google Search Console integration (Service Account JWT, AES-256-CBC encryption)
-* Gutenberg sidebar: live schema validation with errors/warnings
-* Import from Yoast SEO, Rank Math, All in One SEO
-* Weekly schema health report (WP-Cron email)
-* WPML / Polylang multilingual support
-* Schema validator tool
-* 7 new schema types: QAPage, ClaimReview, DefinedTermSet, SoftwareApplication, AudioObject, Course, Event
-* BlogPosting: Speakable, accessMode, potentialAction, about, mentions, isBasedOn, hasPart, temporalCoverage
-* Organization: telephone, contactPoint, description, founder, employee
-* Person: honorificPrefix, alumniOf, hasCredential, mainEntityOfPage
-* Review: name, reviewBody, publisher
-* VideoObject: @id, inLanguage, duration
-* Metabox with 9 toggleable schema types and deprecated-type tooltips
-* Dashboard conflict banner for active SEO plugins
-* Bulk select and fix in posts list
-* FAQ block live word counter (40-60 words optimal)
+* Added: Google Search Console integration (rich results dashboard)
+* Added: Gutenberg sidebar schema preview and validator
+* Added: Import settings from Yoast SEO, Rank Math, All in One SEO
+* Added: WPML / Polylang support
+* Added: Weekly schema health report (WP-Cron email digest)
+* Added: 7 new schema types: QAPage, ClaimReview, DefinedTerm, SoftwareApplication, AudioObject, Course, Event
+* Added: Speakable property on BlogPosting (configurable CSS selectors)
+* Added: alumniOf, hasCredential, honorificPrefix for Person
+* Added: founder, employee for Organization
+* Added: isBasedOn, hasPart, accessMode for BlogPosting
+* Added: Live word counter in FAQ Gutenberg block (optimal: 40–60 words)
+* Added: Bulk select and fix in Posts view
+* Fixed: Meta key mismatch — FAQPage/HowTo/Review toggles now work correctly
+* Fixed: BreadcrumbList now includes full page hierarchy (parent pages)
+* Fixed: supplement_schema() author @id format consistency
+* Fixed: Score cache invalidation on save_post and settings update
 
 = 1.0.0 =
 * Initial release
-* Article/BlogPosting, Person, Organization, WebSite, BreadcrumbList schema
-* FAQPage, HowTo, VideoObject, Review schema
-* AI Search Readiness Score
-* E-E-A-T author scoring
-* Schema Auditor with 3 modes (scan/supplement/replace)
-* Entity detection pipeline with NER and Wikidata
-* Gutenberg FAQ and HowTo blocks
-* Import/Export settings
 
 == Upgrade Notice ==
 
 = 2.0.0 =
-Major update: GSC integration, 7 new schema types, Gutenberg sidebar validator, SEO plugin importer, multilingual support.
-
-= 1.0.0 =
-First release of Ligase.
-
-= 1.0.0 =
-* Initial release
-* Article/BlogPosting, Person, Organization, WebSite, BreadcrumbList schema
-* FAQPage, HowTo, VideoObject, Review schema
-* AI Search Readiness Score
-* E-E-A-T author scoring
-* Schema Auditor with 3 modes (scan/supplement/replace)
-* Entity detection pipeline with NER and Wikidata
-* Gutenberg FAQ and HowTo blocks
-* Import/Export settings
-* Google Schema Changelog widget
-
-== Upgrade Notice ==
-
-= 1.0.0 =
-First release of Ligase.
+Major update with 7 new schema types, GSC integration, and important bug fixes. Update recommended for all users.

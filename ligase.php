@@ -2,9 +2,9 @@
 /**
  * Plugin Name:       Ligase
  * Plugin URI:        https://marcinzmuda.com/ligase
- * Description:       Schema.org JSON-LD dla blogów WordPress. BlogPosting, Person,
- *                    Organization, BreadcrumbList, FAQPage, HowTo, VideoObject.
- *                    Audytor zastępujący słabą schema. Zgodne z Google marzec 2026.
+ * Description:       Complete schema.org JSON-LD for WordPress blogs. BlogPosting, Person,
+ *                    Organization, BreadcrumbList, FAQPage, HowTo, VideoObject, and more.
+ *                    Schema Auditor replaces weak markup. Compliant with Google guidelines March 2026.
  * Version:           2.0.0
  * Requires at least: 6.0
  * Requires PHP:      8.0
