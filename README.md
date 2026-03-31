@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/assets/images/logo.png" alt="Ligase — Schema Markup for WordPress" width="772">
+  <img src="assets/images/banner-772x250.png" alt="Ligase — Schema Markup for WordPress" width="772">
 </p>
 
 <p align="center">

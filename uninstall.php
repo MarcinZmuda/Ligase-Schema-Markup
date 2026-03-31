@@ -15,6 +15,10 @@ delete_option( 'ligase_options' );
 delete_option( 'ligase_gsc_service_account' );
 delete_option( 'ligase_gsc_site_url' );
 delete_option( 'ligase_last_health_report' );
+delete_option( 'ligase_show_onboarding' );
+delete_option( 'ligase_activated_at' );
+delete_option( 'ligase_ner_bulk_done' );
+delete_option( 'ligase_schema_rules' );
 
 // Remove all post meta
 $wpdb->query( $wpdb->prepare(

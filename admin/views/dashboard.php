@@ -70,8 +70,40 @@ if ( $score_value >= 70 ) {
 			<div class="ligase-recommendations">
 				<h3><?php esc_html_e( 'Rekomendacje', 'ligase' ); ?></h3>
 				<ul>
-					<?php foreach ( $recommendations as $rec ) : ?>
-						<li><?php echo esc_html( $rec ); ?></li>
+					<?php
+					// Map keywords to settings page tabs for actionable links
+					$rec_links = array(
+						'logo'        => admin_url( 'admin.php?page=ligase-ustawienia&tab=organization' ),
+						'Logo'        => admin_url( 'admin.php?page=ligase-ustawienia&tab=organization' ),
+						'org_name'    => admin_url( 'admin.php?page=ligase-ustawienia&tab=organization' ),
+						'opis'        => admin_url( 'admin.php?page=ligase-ustawienia&tab=organization' ),
+						'Wikidata'    => admin_url( 'admin.php?page=ligase-ustawienia&tab=social' ),
+						'sameAs'      => admin_url( 'admin.php?page=ligase-ustawienia&tab=social' ),
+						'Social'      => admin_url( 'admin.php?page=ligase-ustawienia&tab=social' ),
+						'jobTitle'    => admin_url( 'admin.php?page=ligase-ustawienia&tab=organization' ),
+						'stanowisko'  => admin_url( 'profile.php' ),
+						'knowsAbout'  => admin_url( 'profile.php' ),
+						'obraz'       => admin_url( 'admin.php?page=ligase-posty' ),
+						'1200'        => admin_url( 'admin.php?page=ligase-posty' ),
+						'image'       => admin_url( 'admin.php?page=ligase-posty' ),
+					);
+					foreach ( $recommendations as $rec ) :
+						$link = '';
+						foreach ( $rec_links as $keyword => $url ) {
+							if ( false !== stripos( $rec, $keyword ) ) {
+								$link = $url;
+								break;
+							}
+						}
+					?>
+						<li>
+							<?php echo esc_html( $rec ); ?>
+							<?php if ( $link ) : ?>
+								<a href="<?php echo esc_url( $link ); ?>" style="margin-left:6px;font-size:11px;">
+									→ <?php esc_html_e( 'Napraw', 'ligase' ); ?>
+								</a>
+							<?php endif; ?>
+						</li>
 					<?php endforeach; ?>
 				</ul>
 			</div>

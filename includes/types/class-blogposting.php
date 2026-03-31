@@ -13,7 +13,7 @@ class Ligase_Type_BlogPosting {
         $author_id = (int) get_post_field( 'post_author', $post_id );
 
         $type = get_post_meta( $post_id, '_ligase_schema_type', true ) ?: 'BlogPosting';
-        $allowed_types = [ 'Article', 'BlogPosting', 'NewsArticle' ];
+        $allowed_types = [ 'Article', 'BlogPosting', 'NewsArticle', 'TechArticle', 'LiveBlogPosting' ];
         if ( ! in_array( $type, $allowed_types, true ) ) {
             $type = 'BlogPosting';
         }
@@ -30,7 +30,7 @@ class Ligase_Type_BlogPosting {
             'dateModified'       => get_the_modified_date( 'c' ),
             'inLanguage'         => str_replace( '_', '-', get_locale() ),
             'isAccessibleForFree'=> true,
-            'author'             => [ '@id' => home_url( '/#author-' . $author_id ) ],
+            'author'             => [ [ '@id' => home_url( '/#author-' . $author_id ) ] ],
             'publisher'          => [ '@id' => home_url( '/#org' ) ],
             'isPartOf'           => [ '@id' => home_url( '/#website' ) ],
         ];
@@ -148,23 +148,30 @@ class Ligase_Type_BlogPosting {
         }
 
         $img = wp_get_attachment_image_src( $tid, 'full' );
-        if ( ! $img || ! is_array( $img ) || (int) $img[1] < 696 ) {
+        if ( ! $img || ! is_array( $img ) ) {
+            return [];
+        }
+
+        $width  = (int) $img[1];
+        $height = (int) $img[2];
+
+        // Google minimum for rich results: 696px
+        // Google recommendation for Top Stories / Discover: 1200px
+        // We require 1200px to match the score.php threshold and optimise for Discover.
+        if ( $width < 1200 ) {
             if ( class_exists( 'Ligase_Logger' ) ) {
-                Ligase_Logger::warning( 'Post image below minimum width (696px)', [
+                Ligase_Logger::warning( 'Post image below recommended 1200px — schema image omitted', [
                     'post_id' => $post_id,
-                    'width'   => (int) ( $img[1] ?? 0 ),
+                    'width'   => $width,
                 ] );
             }
             return [];
         }
 
         $url    = esc_url( $img[0] );
-        $width  = (int) $img[1];
-        $height = (int) $img[2];
-
         $images = [];
 
-        // Original / 16:9 variant
+        // Primary image — original dimensions (likely 16:9 or wider)
         $images[] = [
             '@type'  => 'ImageObject',
             '@id'    => esc_url( get_permalink() ) . '#primaryimage',
@@ -173,7 +180,7 @@ class Ligase_Type_BlogPosting {
             'height' => $height,
         ];
 
-        // 4:3 variant (crop dimensions, same URL — Google handles cropping)
+        // 4:3 variant — Google recommends this ratio for article rich results
         if ( $width >= 1200 && $height >= 900 ) {
             $images[] = [
                 '@type'  => 'ImageObject',
@@ -183,9 +190,9 @@ class Ligase_Type_BlogPosting {
             ];
         }
 
-        // 1:1 variant
+        // 1:1 variant — used in Google Discover and some Knowledge Panel views
         $square = min( $width, $height );
-        if ( $square >= 696 ) {
+        if ( $square >= 1200 ) {
             $images[] = [
                 '@type'  => 'ImageObject',
                 'url'    => $url,

@@ -52,12 +52,18 @@ $toggles = array(
 		'label' => __( 'Event (wydarzenie)', 'ligase' ),
 		'hint'  => __( 'Aktywny rich result. Webinary, meetupy, konferencje.', 'ligase' ),
 	),
+	'_ligase_enable_service'     => array(
+		'label' => __( 'Service (usluga)', 'ligase' ),
+		'hint'  => __( 'Dla stron usług. Podlacza usluge do Organization entity.', 'ligase' ),
+	),
 );
 
 $allowed_types = array(
-	'Article'      => __( 'Article', 'ligase' ),
-	'BlogPosting'  => __( 'BlogPosting', 'ligase' ),
-	'NewsArticle'  => __( 'NewsArticle', 'ligase' ),
+	'BlogPosting'     => __( 'BlogPosting — personal blog, opinion, company blog', 'ligase' ),
+	'Article'         => __( 'Article — evergreen guides, pillar content', 'ligase' ),
+	'TechArticle'     => __( 'TechArticle — tutorials, developer docs, code guides', 'ligase' ),
+	'NewsArticle'     => __( 'NewsArticle — news reporting ⚠️ requires Google Publisher Center', 'ligase' ),
+	'LiveBlogPosting' => __( 'LiveBlogPosting — live coverage, real-time events', 'ligase' ),
 );
 ?>
 

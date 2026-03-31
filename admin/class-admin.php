@@ -78,12 +78,17 @@ class Ligase_Admin {
 				'cap'   => 'edit_posts',
 			),
 			array(
+				'title' => __( 'Automatyzacja', 'ligase' ),
+				'slug'  => 'ligase-rules',
+				'cap'   => 'manage_options',
+			),
+			array(
 				'title' => __( 'Audytor', 'ligase' ),
 				'slug'  => 'ligase-audytor',
 				'cap'   => 'manage_options',
 			),
 			array(
-				'title' => __( 'Encje', 'ligase' ),
+				'title' => __( 'AI Entities', 'ligase' ),
 				'slug'  => 'ligase-encje',
 				'cap'   => 'manage_options',
 			),
@@ -172,6 +177,7 @@ class Ligase_Admin {
 			'ligase-audytor'    => 'auditor.php',
 			'ligase-encje'      => 'entities.php',
 			'ligase-narzedzia'  => 'tools.php',
+			'ligase-rules'      => 'rules.php',
 		);
 
 		$view_file = $view_map[ $page_slug ] ?? 'dashboard.php';
@@ -309,7 +315,7 @@ class Ligase_Admin {
 		}
 
 		// Schema type.
-		$allowed_types = array( 'Article', 'BlogPosting', 'NewsArticle' );
+		$allowed_types = array( 'Article', 'BlogPosting', 'NewsArticle', 'TechArticle', 'LiveBlogPosting' );
 		if ( isset( $_POST['ligase_schema_type'] ) ) {
 			$schema_type = sanitize_text_field( wp_unslash( $_POST['ligase_schema_type'] ) );
 			if ( in_array( $schema_type, $allowed_types, true ) ) {
@@ -321,7 +327,7 @@ class Ligase_Admin {
 		$toggles = array(
 			'_ligase_enable_faq', '_ligase_enable_howto', '_ligase_enable_review',
 			'_ligase_enable_qapage', '_ligase_enable_glossary', '_ligase_enable_claimreview',
-			'_ligase_enable_software', '_ligase_enable_course', '_ligase_enable_event',
+			'_ligase_enable_software', '_ligase_enable_course', '_ligase_enable_event', '_ligase_enable_service',
 		);
 		foreach ( $toggles as $key ) {
 			$value = isset( $_POST[ $key ] ) ? '1' : '0';

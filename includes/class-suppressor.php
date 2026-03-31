@@ -50,6 +50,18 @@ class Ligase_Suppressor {
                 [ 'tribe_events_jsonld_enabled', '__return_false' ],
             ],
         ],
+        'the_seo_framework' => [
+            'name'    => 'The SEO Framework',
+            'detect'  => [ 'THE_SEO_FRAMEWORK_VERSION', 'The_SEO_Framework\Bootstrap' ],
+            'filters' => [
+                [ 'the_seo_framework_schema_output', '__return_false' ],
+            ],
+        ],
+        'slim_seo' => [
+            'name'    => 'Slim SEO',
+            'detect'  => [ 'SLIM_SEO_VER', 'SlimSEO\Slim_SEO' ],
+            'filters' => [],
+        ],
     ];
 
     /**

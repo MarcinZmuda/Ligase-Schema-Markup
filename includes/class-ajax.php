@@ -49,6 +49,14 @@ class Ligase_Ajax {
 			'ligase_gsc_test_connection',
 			'ligase_gsc_sync',
 			'ligase_gsc_rich_results',
+			'ligase_ner_run_post',
+			'ligase_ner_run_bulk',
+			'ligase_ner_bulk_status',
+			'ligase_ner_save_entities',
+			'ligase_get_schema_rules',
+			'ligase_save_schema_rule',
+			'ligase_delete_schema_rule',
+			'ligase_toggle_schema_rule',
 		);
 
 		foreach ( $actions as $action ) {
@@ -930,5 +938,270 @@ class Ligase_Ajax {
 		}
 
 		wp_send_json_success( $data );
+	}
+
+	// =========================================================================
+	// NER API handlers
+	// =========================================================================
+
+	/**
+	 * Run AI NER for a single post (on-demand).
+	 */
+	public function handle_ligase_ner_run_post(): void {
+		$this->verify_request();
+
+		$post_id = absint( $_POST['post_id'] ?? 0 );
+		if ( ! $post_id || ! get_post( $post_id ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid post ID.' ) );
+		}
+
+		$ner = new Ligase_NER_API();
+
+		if ( ! $ner->is_configured() ) {
+			wp_send_json_error( array(
+				'message' => 'AI NER provider not configured. Go to Ligase → Settings → AI Entity Detection.',
+				'code'    => 'not_configured',
+			) );
+		}
+
+		// Force fresh result (clear cache)
+		$post = get_post( $post_id );
+		delete_transient( 'ligase_ner_api_' . $post_id . '_' . md5( $post->post_modified ) );
+
+		$result = $ner->extract( $post_id );
+
+		if ( ! $result ) {
+			wp_send_json_error( array(
+				'message' => 'AI NER failed. Check your API key and try again.',
+				'code'    => 'api_error',
+			) );
+		}
+
+		wp_send_json_success( array(
+			'entities' => $result,
+			'provider' => get_option( 'ligase_options', array() )['ner_provider'] ?? '',
+			'post_id'  => $post_id,
+		) );
+	}
+
+	/**
+	 * Schedule bulk AI NER for all posts.
+	 */
+	public function handle_ligase_ner_run_bulk(): void {
+		$this->verify_request();
+
+		$ner = new Ligase_NER_API();
+
+		if ( ! $ner->is_configured() ) {
+			wp_send_json_error( array(
+				'message' => 'AI NER provider not configured.',
+				'code'    => 'not_configured',
+			) );
+		}
+
+		$force     = ! empty( $_POST['force'] );
+		$scheduled = $ner->schedule_bulk( $force );
+
+		$post_count = (int) wp_count_posts( 'post' )->publish;
+		$estimate   = $ner->estimate_cost( $scheduled );
+
+		// Reset counter
+		update_option( 'ligase_ner_bulk_done', 0 );
+
+		wp_send_json_success( array(
+			'scheduled'       => $scheduled,
+			'total_posts'     => $post_count,
+			'already_done'    => $post_count - $scheduled,
+			'estimated_cost'  => $estimate['cost_formatted'],
+			'provider'        => $estimate['provider'],
+			'message'         => sprintf(
+				'%d posts scheduled. Estimated cost: %s. Processing in background via WP-Cron.',
+				$scheduled,
+				$estimate['cost_formatted']
+			),
+		) );
+	}
+
+	/**
+	 * Get bulk NER scan progress.
+	 */
+	public function handle_ligase_ner_bulk_status(): void {
+		$this->verify_request();
+		wp_send_json_success( Ligase_NER_API::get_bulk_status() );
+	}
+
+	/**
+	 * Save selected entities to post meta (user accepts from UI).
+	 */
+	public function handle_ligase_ner_save_entities(): void {
+		$this->verify_request();
+
+		$post_id  = absint( $_POST['post_id'] ?? 0 );
+		$entities = wp_unslash( $_POST['entities'] ?? array() );
+
+		if ( ! $post_id || ! get_post( $post_id ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid post ID.' ) );
+		}
+
+		if ( ! is_array( $entities ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid entities data.' ) );
+		}
+
+		// Sanitize
+		$about    = array();
+		$mentions = array();
+
+		foreach ( $entities as $entity ) {
+			$name = sanitize_text_field( $entity['name'] ?? '' );
+			if ( empty( $name ) ) {
+				continue;
+			}
+			$type = sanitize_text_field( $entity['save_as'] ?? 'mention' );
+			if ( $type === 'about' ) {
+				$about[] = array(
+					'name'   => $name,
+					'sameAs' => esc_url_raw( $entity['wikidata_url'] ?? '' ),
+				);
+			} else {
+				$mentions[] = array( 'name' => $name );
+			}
+		}
+
+		update_post_meta( $post_id, '_ligase_about_entities', $about );
+		update_post_meta( $post_id, '_ligase_mentions', $mentions );
+
+		// Invalidate schema cache for this post
+		Ligase_Cache::invalidate_post( $post_id );
+
+		wp_send_json_success( array(
+			'about'    => count( $about ),
+			'mentions' => count( $mentions ),
+			'message'  => sprintf(
+				'Saved: %d about entities, %d mentions. Schema cache cleared.',
+				count( $about ),
+				count( $mentions )
+			),
+		) );
+	}
+
+	// =========================================================================
+	// Schema Rules AJAX handlers
+	// =========================================================================
+
+	/**
+	 * Get all schema automation rules.
+	 */
+	public function handle_ligase_get_schema_rules(): void {
+		$this->verify_request();
+
+		$rules      = Ligase_Schema_Rules::get_rules();
+		$categories = get_categories( array( 'hide_empty' => false, 'number' => 200 ) );
+		$tags       = get_tags( array( 'hide_empty' => false, 'number' => 200 ) );
+		$authors    = get_users( array( 'has_published_posts' => true ) );
+		$post_types = get_post_types( array( 'public' => true ), 'objects' );
+
+		wp_send_json_success( array(
+			'rules'       => $rules,
+			'schema_types'=> Ligase_Schema_Rules::SCHEMA_TYPES,
+			'categories'  => array_map( fn( $c ) => array( 'id' => $c->term_id, 'name' => $c->name ), $categories ),
+			'tags'        => array_map( fn( $t ) => array( 'id' => $t->term_id, 'name' => $t->name ), $tags ),
+			'authors'     => array_map( fn( $u ) => array( 'id' => $u->ID, 'name' => $u->display_name ), $authors ),
+			'post_types'  => array_map( fn( $pt ) => array( 'slug' => $pt->name, 'label' => $pt->label ), (array) $post_types ),
+		) );
+	}
+
+	/**
+	 * Save (create or update) a single schema rule.
+	 */
+	public function handle_ligase_save_schema_rule(): void {
+		$this->verify_request();
+
+		$rule_data = wp_unslash( $_POST['rule'] ?? array() );
+		if ( ! is_array( $rule_data ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid rule data.' ) );
+		}
+
+		// Sanitize
+		$rule = array(
+			'id'              => sanitize_key( $rule_data['id'] ?? Ligase_Schema_Rules::generate_id() ),
+			'name'            => sanitize_text_field( $rule_data['name'] ?? '' ),
+			'condition_type'  => sanitize_key( $rule_data['condition_type'] ?? 'category' ),
+			'condition_value' => sanitize_text_field( $rule_data['condition_value'] ?? '' ),
+			'schema_keys'     => array_map( 'sanitize_key', (array) ( $rule_data['schema_keys'] ?? array() ) ),
+			'enabled'         => ! empty( $rule_data['enabled'] ),
+		);
+
+		if ( empty( $rule['schema_keys'] ) ) {
+			wp_send_json_error( array( 'message' => 'Select at least one schema type.' ) );
+		}
+
+		// Validate schema keys against whitelist
+		$allowed = array_values( Ligase_Schema_Rules::SCHEMA_TYPES );
+		$rule['schema_keys'] = array_values( array_filter(
+			$rule['schema_keys'],
+			fn( $k ) => in_array( $k, $allowed, true )
+		) );
+
+		if ( empty( $rule['schema_keys'] ) ) {
+			wp_send_json_error( array( 'message' => 'Invalid schema type.' ) );
+		}
+
+		$rules = Ligase_Schema_Rules::get_rules();
+
+		// Update existing or append
+		$found = false;
+		foreach ( $rules as $i => $existing ) {
+			if ( $existing['id'] === $rule['id'] ) {
+				$rules[ $i ] = $rule;
+				$found        = true;
+				break;
+			}
+		}
+		if ( ! $found ) {
+			$rules[] = $rule;
+		}
+
+		Ligase_Schema_Rules::save_rules( $rules );
+
+		wp_send_json_success( array( 'rule' => $rule, 'total' => count( $rules ) ) );
+	}
+
+	/**
+	 * Delete a schema rule by ID.
+	 */
+	public function handle_ligase_delete_schema_rule(): void {
+		$this->verify_request();
+
+		$rule_id = sanitize_key( $_POST['rule_id'] ?? '' );
+		if ( ! $rule_id ) {
+			wp_send_json_error( array( 'message' => 'Missing rule_id.' ) );
+		}
+
+		$rules   = Ligase_Schema_Rules::get_rules();
+		$rules   = array_values( array_filter( $rules, fn( $r ) => $r['id'] !== $rule_id ) );
+		Ligase_Schema_Rules::save_rules( $rules );
+
+		wp_send_json_success( array( 'deleted' => $rule_id, 'total' => count( $rules ) ) );
+	}
+
+	/**
+	 * Toggle a rule on/off.
+	 */
+	public function handle_ligase_toggle_schema_rule(): void {
+		$this->verify_request();
+
+		$rule_id = sanitize_key( $_POST['rule_id'] ?? '' );
+		$rules   = Ligase_Schema_Rules::get_rules();
+
+		foreach ( $rules as &$rule ) {
+			if ( $rule['id'] === $rule_id ) {
+				$rule['enabled'] = ! $rule['enabled'];
+				break;
+			}
+		}
+		unset( $rule );
+
+		Ligase_Schema_Rules::save_rules( $rules );
+		wp_send_json_success();
 	}
 }

@@ -174,10 +174,16 @@ final class Ligase_Logger {
 		}
 
 		$htaccess = trailingslashit( $this->log_dir ) . '.htaccess';
-
 		if ( ! file_exists( $htaccess ) ) {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 			file_put_contents( $htaccess, "Deny from all\n" );
+		}
+
+		// Nginx fallback — index.php blocks directory listing and direct access
+		$index = trailingslashit( $this->log_dir ) . 'index.php';
+		if ( ! file_exists( $index ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			file_put_contents( $index, '<?php // Silence is golden.' );
 		}
 	}
 

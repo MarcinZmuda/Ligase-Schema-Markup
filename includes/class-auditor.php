@@ -513,11 +513,13 @@ class Ligase_Auditor {
 		}
 
 		if ( empty( $schema['author'] ) ) {
-			$author_id      = (int) $post->post_author;
+			$author_id        = (int) $post->post_author;
 			$schema['author'] = array(
-				'@type' => 'Person',
-				'@id'   => home_url( '/#author-' . $author_id ),
-				'name'  => get_the_author_meta( 'display_name', $author_id ),
+				array(
+					'@type' => 'Person',
+					'@id'   => home_url( '/#author-' . $author_id ),
+					'name'  => get_the_author_meta( 'display_name', $author_id ),
+				),
 			);
 		}
 

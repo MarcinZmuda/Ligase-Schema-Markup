@@ -11,7 +11,7 @@ class Ligase_Type_DefinedTerm {
 
         $post_id = get_the_ID();
 
-        if ( get_post_meta( $post_id, '_ligase_enable_glossary', true ) !== '1' ) {
+        if ( get_post_meta( $post_id, '_ligase_enable_glossary', true ) !== '1' && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_glossary', $post_id ) ) {
             return null;
         }
 

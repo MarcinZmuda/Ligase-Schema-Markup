@@ -9,7 +9,7 @@ class Ligase_Type_Review {
             return null;
         }
 
-        if ( get_post_meta( get_the_ID(), '_ligase_enable_review', true ) !== '1' ) {
+        if ( get_post_meta( get_the_ID(), '_ligase_enable_review', true ) !== '1' && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_review', get_the_ID() ) ) {
             return null;
         }
 

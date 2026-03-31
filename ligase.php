@@ -27,3 +27,9 @@ require_once LIGASE_DIR . 'includes/class-plugin.php';
 add_action( 'plugins_loaded', function() {
     Ligase_Plugin::get_instance();
 } );
+
+// Activation hook — set flag to show onboarding notice
+register_activation_hook( __FILE__, function() {
+    update_option( 'ligase_show_onboarding', '1' );
+    update_option( 'ligase_activated_at', time() );
+} );

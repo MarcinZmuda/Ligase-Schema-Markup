@@ -9,7 +9,7 @@ class Ligase_Type_HowTo {
             return null;
         }
 
-        if ( get_post_meta( get_the_ID(), '_ligase_enable_howto', true ) !== '1' ) {
+        if ( get_post_meta( get_the_ID(), '_ligase_enable_howto', true ) !== '1' && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_howto', get_the_ID() ) ) {
             return null;
         }
 

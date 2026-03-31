@@ -14,7 +14,17 @@ class Ligase_Output {
         }
 
         $post_id   = get_the_ID() ?: 0;
-        $cache_key = 'ligase_' . $post_id . '_' . get_locale() . '_' . LIGASE_VERSION;
+
+        // Build a unique cache key that distinguishes all page contexts.
+        // get_the_ID() returns 0 on archives, home, search — causing collisions.
+        // Use the full request URI as part of the key for non-singular pages.
+        if ( $post_id ) {
+            $cache_key = 'ligase_' . $post_id . '_' . get_locale() . '_' . LIGASE_VERSION;
+        } else {
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+            $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
+            $cache_key   = 'ligase_arc_' . md5( $request_uri ) . '_' . get_locale() . '_' . LIGASE_VERSION;
+        }
         $cached    = Ligase_Cache::get( $cache_key );
 
         if ( false !== $cached ) {
