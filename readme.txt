@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.2
-Stable tag: 2.3.0
+Stable tag: 2.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,16 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.3.1 =
+**Lifecycle cleanup — no ghost cron events or orphaned files after deactivate/uninstall.**
+
+* **`register_deactivation_hook`** added to the main plugin file. On deactivate, calls `Ligase_Health_Report::unschedule()` and explicitly clears the three known cron hooks (`ligase_weekly_health_report`, `ligase_ner_api_extract`, `ligase_wikidata_lookup`). Without this, WP-Cron kept firing scheduled events against missing class handlers after every deactivate, filling debug.log with PHP fatals.
+* **`uninstall.php`** rewritten:
+  - Explicit `wp_clear_scheduled_hook()` for all three cron hooks (single + recurring events for the same hook are both cleared by this call).
+  - Explicit `delete_transient('ligase_gsc_access_token')` + `delete_transient('ligase_site_score')` up front (the LIKE catch-all already covered these, but explicit calls survive any future key-shape change).
+  - Added the four `ligase_ner_bulk_*` options introduced in 2.0.2/2.1.0 to the explicit delete list, plus a LIKE catch-all `ligase_%` for anything we forget to list.
+  - Log-directory cleanup now removes hidden protection files (`.htaccess`, IIS `web.config`, `index.php`) via a `glob('.[!.]*')` pass before `rmdir()`. Previously `rmdir()` failed silently because the default `glob('*')` doesn't match dotfiles, leaving the directory orphaned.
 
 = 2.3.0 =
 **Three new schema types — closing the biggest P1 gaps from the competitive benchmark.**
