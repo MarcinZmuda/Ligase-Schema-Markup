@@ -5,9 +5,9 @@
  * Description:       Complete schema.org JSON-LD for WordPress blogs. BlogPosting, Person,
  *                    Organization, BreadcrumbList, FAQPage, HowTo, VideoObject, and more.
  *                    Schema Auditor replaces weak markup. Compliant with Google guidelines March 2026.
- * Version:           2.3.1
+ * Version:           2.3.2
  * Requires at least: 6.0
- * Requires PHP:      8.2
+ * Requires PHP:      8.0
  * Author:            Marcin Żmuda
  * Author URI:        https://marcinzmuda.com
  * License:           GPL v2 or later
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LIGASE_VERSION', '2.3.1' );
+define( 'LIGASE_VERSION', '2.3.2' );
 define( 'LIGASE_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'LIGASE_URL',     plugin_dir_url( __FILE__ ) );
 define( 'LIGASE_FILE',    __FILE__ );

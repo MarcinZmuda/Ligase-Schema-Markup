@@ -3,8 +3,8 @@ Contributors: marcinzmuda
 Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org, entity graph
 Requires at least: 6.0
 Tested up to: 6.8
-Requires PHP: 8.2
-Stable tag: 2.3.1
+Requires PHP: 8.0
+Stable tag: 2.3.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,32 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.3.2 =
+**PHP floor lowered from 8.2 to 8.0 — wider compatibility, no code changes.**
+
+The 8.2 floor in 2.0.2 was conservative: a full code audit confirmed the plugin
+uses **zero** PHP 8.1+ structural features (no `readonly`, no `enum`, no `never`
+return type, no first-class callable syntax `Foo::bar(...)`, no `array_is_list()`,
+no `new` in initializers, no intersection/DNF types, no final class constants).
+
+All language features that ARE used — constructor promotion, `match` expressions,
+union types, `mixed` type, nullsafe `?->`, `str_contains`/`str_starts_with`/
+`str_ends_with` — work on PHP 8.0 (released Nov 2020).
+
+CHANGES
+- ligase.php header: `Requires PHP: 8.0`
+- composer.json require: `php >=8.0`
+- readme.txt: `Requires PHP: 8.0`
+- phpcs.xml.dist: PHPCompatibilityWP testVersion `8.0-`
+- README.md badge + Requirements section
+
+NOTE
+- PHP 8.0 reached EOL on 2023-11-26. The plugin runs on it but you should still
+  plan to upgrade to PHP 8.1+ on the hosting side — Ligase will keep working
+  either way.
+- PHP 7.4 is NOT supported (constructor promotion, match, union types, nullsafe,
+  str_contains et al. all require 8.0).
 
 = 2.3.1 =
 **Lifecycle cleanup — no ghost cron events or orphaned files after deactivate/uninstall.**
