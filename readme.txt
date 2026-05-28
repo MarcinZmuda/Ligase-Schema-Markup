@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.3.2
+Stable tag: 2.3.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,50 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.3.3 =
+**Critical fix: schema for the wrong page on themes/plugins that call query_posts().**
+
+Diagnosed live on makumi.eu (XStore theme + WooCommerce + Yoast SEO 27.7): single
+product pages received CollectionPage schema with a CATEGORY url, no Product node.
+Root cause: the XStore theme calls `query_posts()` before `wp_head` priority 5
+fires, corrupting `is_single()` / `is_tax()` / `get_the_ID()` so that Ligase's
+Generator chose the taxonomy-archive branch on what was actually a product page.
+
+Same pattern affects Divi, Avada, Flatsome, and several "related products"
+widgets/plugins (anything that runs a secondary main-query before wp_head).
+
+FIXES
+
+1. **Generator now derives page context from `get_queried_object()`** instead
+   of conditional tags. The queried object is set ONCE when the main query is
+   parsed and is unaffected by subsequent `query_posts()` calls. New
+   `resolve_context()` returns one of: `single_post`, `single_cpt`, `page`,
+   `front_page_posts`, `blog_listing`, `taxonomy_archive`, `author_archive`,
+   `date_or_search`, `unknown`. Each routes to exactly one builder — no more
+   multiple branches firing on the same request.
+
+2. **`with_post_globals()` wraps type-class builders** with forced
+   `$GLOBALS['post']` + `setup_postdata()` AND overrides `$wp_query->is_singular`/
+   `is_single`/`is_page`/`is_archive`/`is_tax`/`is_category`/`is_tag` for the
+   duration of the build. Try/finally restores everything so the rest of the
+   page render isn't affected. Without this override, type classes' own
+   `if ( ! is_singular() ) return null` guards still short-circuit on hijacked
+   globals even though the Generator routed correctly.
+
+3. **`Ligase_Output` cache key now uses `get_queried_object()`** instead of
+   `get_the_ID()`. Previously: when globals were hijacked, `get_the_ID()`
+   returned 0 → fell into the "archive" branch → built an archive cache key
+   for the wrong term → served stale CollectionPage schema on every product hit.
+   Now: cache key reflects the actual queried object (post / term / user) and
+   is invariant to `query_posts()`.
+
+UPGRADE
+
+- Drop-in. The version bump alone invalidates all 2.3.x cache entries, so the
+  first hit after upgrade rebuilds with correct schema.
+- If you also run WP Rocket / LiteSpeed Cache / W3 Total Cache, flush their
+  page cache as well — they may have stored the bad HTML.
 
 = 2.3.2 =
 **PHP floor lowered from 8.2 to 8.0 — wider compatibility, no code changes.**

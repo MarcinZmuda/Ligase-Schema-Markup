@@ -13,25 +13,27 @@ class Ligase_Output {
             return;
         }
 
-        $post_id   = get_the_ID() ?: 0;
-
-        // Build a unique cache key that distinguishes all page contexts.
-        // get_the_ID() returns 0 on archives, home, search — causing collisions.
-        // Use the full request URI as part of the key for non-singular pages.
-        if ( $post_id ) {
-            $cache_key = 'ligase_' . $post_id . '_' . get_locale() . '_' . LIGASE_VERSION;
+        // Build a unique cache key from the QUERIED OBJECT (set once when the main
+        // query parses) rather than get_the_ID() (which reads $GLOBALS['post'] and
+        // can be hijacked by themes/plugins calling query_posts() before wp_head).
+        // Without this, makumi.eu-style "queried object is product but get_the_ID
+        // returns 0 because XStore corrupted globals" produced an archive cache key
+        // for the category, then served stale category schema on every product hit.
+        $queried = get_queried_object();
+        if ( $queried instanceof WP_Post ) {
+            $cache_key = 'ligase_' . (int) $queried->ID . '_' . get_locale() . '_' . LIGASE_VERSION;
+        } elseif ( $queried instanceof WP_Term ) {
+            $cache_key = 'ligase_term_' . (int) $queried->term_id . '_' . get_locale() . '_' . LIGASE_VERSION;
+        } elseif ( $queried instanceof WP_User ) {
+            $cache_key = 'ligase_user_' . (int) $queried->ID . '_' . get_locale() . '_' . LIGASE_VERSION;
         } else {
-            // Use the queried object + context tag instead of REQUEST_URI. REQUEST_URI
-            // fragments cache across query-string variants (?utm_*, ?fbclid=...) and
-            // is theoretically poisonable. The queried-object approach gives one cache
-            // entry per logical archive page.
-            $qo_id   = (int) get_queried_object_id();
-            $context = is_archive() ? 'archive'
-                : ( is_search() ? 'search'
-                    : ( is_home() ? 'home'
-                        : ( is_front_page() ? 'front' : 'other' ) ) );
-            $cache_key = 'ligase_arc_' . $context . '_' . $qo_id . '_' . get_locale() . '_' . LIGASE_VERSION;
+            $context = is_search() ? 'search'
+                : ( is_home() ? 'home'
+                    : ( is_front_page() ? 'front'
+                        : ( is_date() ? 'date' : 'other' ) ) );
+            $cache_key = 'ligase_ctx_' . $context . '_' . get_locale() . '_' . LIGASE_VERSION;
         }
+        $post_id = ( $queried instanceof WP_Post ) ? (int) $queried->ID : 0;
         $cached    = Ligase_Cache::get( $cache_key );
 
         if ( false !== $cached ) {

@@ -17,14 +17,116 @@ class Ligase_Generator {
         }
 
         // LocalBusiness — only when configured (address filled in Settings)
-        // Added to all pages so entity is consistent across the site
         if ( Ligase_Type_LocalBusiness::is_configured() ) {
             $graph[] = ( new Ligase_Type_LocalBusiness() )->build();
         }
 
-        // ── Blog post (single post) ─────────────────────────────────────────
-        if ( is_single() && get_post_type() === 'post' ) {
-            $author_id = (int) get_post_field( 'post_author' );
+        // ── Branch selection: derive page context from the QUERIED OBJECT, not
+        //    from is_single()/is_tax(). Some themes (XStore, Divi, Avada) and
+        //    related-products widgets call query_posts() before wp_head fires at
+        //    priority 5, which makes is_single() return false and is_tax() return
+        //    true on what is actually a single product page. The queried object
+        //    is set ONCE when the main query is parsed and isn't affected by
+        //    subsequent secondary queries.
+        $queried = get_queried_object();
+        $resolved_context = $this->resolve_context( $queried );
+
+        switch ( $resolved_context ) {
+            case 'single_post':
+                $this->add_blog_post_graph( $graph, $queried );
+                break;
+            case 'single_cpt':
+                $this->add_cpt_single_graph( $graph, $queried );
+                break;
+            case 'page':
+                $graph[] = $this->build_webpage();
+                $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
+                break;
+            case 'front_page_posts':
+                $graph[] = $this->build_webpage( 'CollectionPage' );
+                break;
+            case 'blog_listing':
+                $graph[] = $this->build_collection_page();
+                $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
+                break;
+            case 'taxonomy_archive':
+                $graph[] = $this->build_collection_page();
+                $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
+                break;
+            case 'author_archive':
+                $author_id = $queried instanceof WP_User ? (int) $queried->ID : (int) get_queried_object_id();
+                $graph[]   = ( new Ligase_Type_Person( $author_id ) )->build();
+                $graph[]   = $this->build_profile_page( $author_id );
+                $graph[]   = $this->build_collection_page();
+                break;
+            case 'date_or_search':
+                $graph[] = $this->build_collection_page();
+                break;
+            // 'unknown' → no page-specific schema, just the site-wide entities above
+        }
+
+        $graph = apply_filters( 'ligase_schema_graph', $graph );
+
+        return array_values( array_filter( $graph ) );
+    }
+
+    /**
+     * Decide what kind of page this is from the queried object.
+     *
+     * Returns one of: single_post / single_cpt / page / front_page_posts /
+     * blog_listing / taxonomy_archive / author_archive / date_or_search / unknown.
+     *
+     * Resilient against query_posts() corruption: get_queried_object() reads from
+     * the original main query, not the current one.
+     */
+    private function resolve_context( $queried ): string {
+        // is_page/is_front_page/is_home work off the ORIGINAL main query in modern WP
+        // even after query_posts(), but we still cross-check queried_object for safety.
+        if ( $queried instanceof WP_Post ) {
+            $pt = $queried->post_type;
+            if ( $pt === 'post' ) {
+                // Posts page vs single post: when "Settings > Reading > Posts page"
+                // is set, the queried object is a page but is_home() is true.
+                if ( function_exists( 'is_home' ) && is_home() && ! is_front_page() ) {
+                    return 'blog_listing';
+                }
+                return 'single_post';
+            }
+            if ( $pt === 'page' ) {
+                return 'page';
+            }
+            return 'single_cpt';
+        }
+
+        if ( $queried instanceof WP_Term ) {
+            return 'taxonomy_archive';
+        }
+
+        if ( $queried instanceof WP_User ) {
+            return 'author_archive';
+        }
+
+        // No object set on main query — probably search/date/404/front-page-posts.
+        if ( function_exists( 'is_front_page' ) && is_front_page() && ! is_page() ) {
+            return 'front_page_posts';
+        }
+        if ( function_exists( 'is_home' ) && is_home() && ! is_front_page() ) {
+            return 'blog_listing';
+        }
+        if ( ( function_exists( 'is_date' ) && is_date() )
+             || ( function_exists( 'is_search' ) && is_search() ) ) {
+            return 'date_or_search';
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * Single regular post (post_type === 'post').
+     */
+    private function add_blog_post_graph( array &$graph, WP_Post $post ): void {
+        $this->with_post_globals( $post, function () use ( &$graph, $post ) {
+            $author_id = (int) $post->post_author;
 
             $graph[] = ( new Ligase_Type_BlogPosting() )->build();
             $graph[] = ( new Ligase_Type_Person( $author_id ) )->build();
@@ -36,67 +138,83 @@ class Ligase_Generator {
                     $graph[] = $schema;
                 }
             }
-        }
+        } );
+    }
 
-        // ── Static page (is_page) ───────────────────────────────────────────
-        if ( is_page() ) {
+    /**
+     * Single CPT (product, recipe, jobposting, custom CPT etc.).
+     */
+    private function add_cpt_single_graph( array &$graph, WP_Post $post ): void {
+        $this->with_post_globals( $post, function () use ( &$graph, $post ) {
+            $author_id = (int) $post->post_author;
+
             $graph[] = $this->build_webpage();
+            $graph[] = ( new Ligase_Type_Person( $author_id ) )->build();
             $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
-        }
 
-        // ── Homepage (front page) ───────────────────────────────────────────
-        if ( is_front_page() && ! is_page() ) {
-            // Static front page is handled by is_page() above.
-            // This covers blog-posts-as-homepage (Settings > Reading > Latest posts).
-            $graph[] = $this->build_webpage( 'CollectionPage' );
-        }
-
-        // ── Custom Post Type (single, not 'post') ───────────────────────────
-        if ( is_single() && get_post_type() !== 'post' && get_post_type() !== 'page' ) {
-            $author_id = (int) get_post_field( 'post_author' );
-            $graph[]   = $this->build_webpage();
-            $graph[]   = ( new Ligase_Type_Person( $author_id ) )->build();
-            $graph[]   = ( new Ligase_Type_BreadcrumbList() )->build();
-
-            // Optional types still apply (FAQ, HowTo, VideoObject etc.)
             foreach ( $this->get_optional_types() as $type ) {
                 $schema = $type->build();
                 if ( ! empty( $schema ) ) {
                     $graph[] = $schema;
                 }
             }
+        } );
+    }
+
+    /**
+     * Run a callback with $GLOBALS['post'] AND $wp_query->is_singular forced
+     * for the queried post, then restored after. Type-class builders rely on
+     * is_singular() / get_the_ID() / get_post_meta() — all of which fail when
+     * a theme (XStore, Divi, Avada) or a related-products plugin called
+     * query_posts() before wp_head priority 5.
+     *
+     * This is a localized override with try/finally so any throw still restores
+     * the original state.
+     */
+    private function with_post_globals( WP_Post $post, callable $fn ): void {
+        global $wp_query;
+
+        $original_post     = $GLOBALS['post'] ?? null;
+        $original_singular = $wp_query->is_singular   ?? false;
+        $original_is_single = $wp_query->is_single    ?? false;
+        $original_is_page   = $wp_query->is_page      ?? false;
+        $original_is_arch   = $wp_query->is_archive   ?? false;
+        $original_is_tax    = $wp_query->is_tax       ?? false;
+        $original_is_cat    = $wp_query->is_category  ?? false;
+        $original_is_tag    = $wp_query->is_tag       ?? false;
+
+        // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+        $GLOBALS['post'] = $post;
+        setup_postdata( $post );
+
+        // Force conditional tags to report the truth about the queried object.
+        $wp_query->is_singular = true;
+        $wp_query->is_single   = ( $post->post_type !== 'page' );
+        $wp_query->is_page     = ( $post->post_type === 'page' );
+        $wp_query->is_archive  = false;
+        $wp_query->is_tax      = false;
+        $wp_query->is_category = false;
+        $wp_query->is_tag      = false;
+
+        try {
+            $fn();
+        } finally {
+            $wp_query->is_singular = $original_singular;
+            $wp_query->is_single   = $original_is_single;
+            $wp_query->is_page     = $original_is_page;
+            $wp_query->is_archive  = $original_is_arch;
+            $wp_query->is_tax      = $original_is_tax;
+            $wp_query->is_category = $original_is_cat;
+            $wp_query->is_tag      = $original_is_tag;
+
+            if ( $original_post instanceof WP_Post ) {
+                // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+                $GLOBALS['post'] = $original_post;
+                setup_postdata( $original_post );
+            } else {
+                wp_reset_postdata();
+            }
         }
-
-        // ── Blog posts listing page (is_home, not front page) ───────────────
-        // Triggered when Settings > Reading > Posts page is set to a separate URL
-        // e.g. corporate site with /blog/ page
-        if ( is_home() && ! is_front_page() ) {
-            $graph[] = $this->build_collection_page();
-            $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
-        }
-
-        // ── Category / tag / taxonomy archive ──────────────────────────────
-        if ( is_category() || is_tag() || is_tax() ) {
-            $graph[] = $this->build_collection_page();
-            $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
-        }
-
-        // ── Author archive ──────────────────────────────────────────────────
-        if ( is_author() ) {
-            $author_id = (int) get_queried_object_id();
-            $graph[]   = ( new Ligase_Type_Person( $author_id ) )->build();
-            $graph[]   = $this->build_profile_page( $author_id );
-            $graph[]   = $this->build_collection_page();
-        }
-
-        // ── Date / search archives ──────────────────────────────────────────
-        if ( is_date() || is_search() ) {
-            $graph[] = $this->build_collection_page();
-        }
-
-        $graph = apply_filters( 'ligase_schema_graph', $graph );
-
-        return array_values( array_filter( $graph ) );
     }
 
     /**
