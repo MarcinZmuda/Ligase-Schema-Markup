@@ -346,8 +346,8 @@ class Ligase_Score {
 			$recommendations[] = $check['recommendation'];
 		}
 
-		// 11. wordCount > 300 (5 pts).
-		$word_count = str_word_count( wp_strip_all_tags( $post->post_content ) );
+		// 11. wordCount > 300 (5 pts). Unicode-aware so Polish posts aren't undercounted.
+		$word_count = preg_match_all( '/[\p{L}\p{N}_]+/u', wp_strip_all_tags( $post->post_content ) );
 		$passed     = $word_count > 300;
 		$check      = $this->make_check(
 			'post_word_count',
@@ -380,10 +380,100 @@ class Ligase_Score {
 			$recommendations[] = $check['recommendation'];
 		}
 
+		// 13. Pipeline-driven AI bonus checks. These read entity-pipeline meta and reward
+		//     real AI-citation signals (sameAs/Wikidata linking, LLM-verified entities)
+		//     instead of the easy "field is non-empty" checks above. Each is optional —
+		//     score caps at 100 either way.
+		$check = $this->check_post_wikidata_links( $post_id );
+		$checks[] = $check;
+		$total   += $check['points'];
+		if ( ! $check['passed'] ) {
+			$recommendations[] = $check['recommendation'];
+		}
+
+		$check = $this->check_post_ner_verified( $post_id );
+		$checks[] = $check;
+		$total   += $check['points'];
+		if ( ! $check['passed'] ) {
+			$recommendations[] = $check['recommendation'];
+		}
+
+		$check = $this->check_post_about_mentions( $post_id );
+		$checks[] = $check;
+		$total   += $check['points'];
+		if ( ! $check['passed'] ) {
+			$recommendations[] = $check['recommendation'];
+		}
+
 		return array(
 			'score'           => max( 0, min( 100, $total ) ),
 			'checks'          => $checks,
 			'recommendations' => array_values( array_filter( $recommendations ) ),
+		);
+	}
+
+	/**
+	 * Reward posts with applied Wikidata sameAs links (strongest AI citation signal).
+	 */
+	private function check_post_wikidata_links( int $post_id ): array {
+		$suggestions = get_post_meta( $post_id, '_ligase_wikidata_suggestions', true );
+		$count       = is_array( $suggestions ) ? count( $suggestions ) : 0;
+		$passed      = $count > 0;
+		return $this->make_check(
+			'post_wikidata_links',
+			'Linkowanie encji Wikidata (sameAs)',
+			$passed,
+			$passed ? 10 : 0,
+			10,
+			$passed ? '' : 'Uruchom skanowanie encji wtyczki - linkowanie do Wikidata to najsilniejszy sygnal AI.'
+		);
+	}
+
+	/**
+	 * Reward posts with LLM-verified named entities.
+	 */
+	private function check_post_ner_verified( int $post_id ): array {
+		$api = get_post_meta( $post_id, '_ligase_ner_api_results', true );
+		$count = 0;
+		if ( is_array( $api ) ) {
+			foreach ( [ 'persons', 'organizations', 'products', 'locations' ] as $bucket ) {
+				if ( ! empty( $api[ $bucket ] ) && is_array( $api[ $bucket ] ) ) {
+					$count += count( $api[ $bucket ] );
+				}
+			}
+		}
+		$passed = $count > 0;
+		return $this->make_check(
+			'post_ner_verified',
+			'Rozpoznane encje (NER + LLM)',
+			$passed,
+			$passed ? 5 : 0,
+			5,
+			$passed ? '' : 'Uruchom analize NER (panel Ligase), aby rozpoznac encje w tresci.'
+		);
+	}
+
+	/**
+	 * Reward posts with about/mentions Schema entities (preferably with sameAs).
+	 */
+	private function check_post_about_mentions( int $post_id ): array {
+		$about    = (array) get_post_meta( $post_id, '_ligase_about_entities', true );
+		$mentions = (array) get_post_meta( $post_id, '_ligase_mentions', true );
+		$has_sameas = false;
+		foreach ( array_merge( $about, $mentions ) as $entity ) {
+			if ( is_array( $entity ) && ! empty( $entity['sameAs'] ) ) {
+				$has_sameas = true;
+				break;
+			}
+		}
+		$passed = $has_sameas;
+		return $this->make_check(
+			'post_about_mentions',
+			'about/mentions z sameAs',
+			$passed,
+			$passed ? 5 : 0,
+			5,
+			$passed ? '' : 'Dodaj encje about/mentions z linkiem sameAs (np. Wikipedia/Wikidata).'
 		);
 	}
 
@@ -580,6 +670,136 @@ class Ligase_Score {
 		set_transient( $cache_key, $result, HOUR_IN_SECONDS * 6 );
 
 		return $result;
+	}
+
+	// =========================================================================
+	// Data-driven scoring (headless, no WP coupling) — used by tests and external integrators.
+	// =========================================================================
+
+	/**
+	 * Score a site from a flat data array. WP-independent.
+	 *
+	 * @param array{
+	 *     site_name?: string, site_description?: string, site_url?: string,
+	 *     site_icon?: string, site_logo?: string, language?: string,
+	 *     organization?: string, social_profiles?: array, search_action?: bool,
+	 *     breadcrumbs?: bool
+	 * } $data
+	 */
+	public function calculate_site_score( array $data ): array {
+		$checks = [];
+		$total  = 0;
+
+		$rules = [
+			[ 'site_name',        15, 'Nazwa witryny',          'Ustaw nazwę witryny.' ],
+			[ 'site_url',         15, 'URL witryny',            'Ustaw URL witryny.' ],
+			[ 'site_logo',        15, 'Logo organizacji',       'Dodaj logo organizacji.' ],
+			[ 'language',         10, 'Język (inLanguage)',     'Ustaw język witryny.' ],
+			[ 'organization',     10, 'Nazwa organizacji',      'Ustaw nazwę organizacji.' ],
+			[ 'site_description', 10, 'Opis witryny',           'Dodaj opis witryny.' ],
+			[ 'site_icon',         5, 'Favicon witryny',        'Dodaj favicon.' ],
+			[ 'social_profiles',   5, 'Profile społecznościowe (sameAs)', 'Dodaj profile do sameAs.' ],
+			[ 'search_action',     5, 'SearchAction (WebSite)', 'Włącz SearchAction.' ],
+			[ 'breadcrumbs',       5, 'BreadcrumbList',         'Włącz BreadcrumbList.' ],
+			[ 'language',          5, 'Locale (alias)',         'Ustaw locale.' ],
+		];
+
+		foreach ( $rules as [ $key, $pts, $label, $reco ] ) {
+			$value  = $data[ $key ] ?? null;
+			$passed = ! empty( $value );
+			$checks[] = $this->make_check( 'site_' . $key, $label, $passed, $passed ? $pts : 0, $pts, $passed ? '' : $reco );
+			if ( $passed ) {
+				$total += $pts;
+			}
+		}
+
+		return [
+			'score'           => max( 0, min( 100, $total ) ),
+			'checks'          => $checks,
+			'recommendations' => array_values( array_filter( array_map( fn( $c ) => $c['recommendation'], $checks ) ) ),
+		];
+	}
+
+	/**
+	 * Score a post from a flat data array.
+	 */
+	public function calculate_post_score( array $data ): array {
+		$checks = [];
+		$total  = 0;
+
+		$title          = (string) ( $data['title']        ?? '' );
+		$excerpt        = (string) ( $data['excerpt']      ?? '' );
+		$url            = (string) ( $data['url']          ?? '' );
+		$author_name    = (string) ( $data['author_name']  ?? '' );
+		$image_url      = (string) ( $data['image_url']    ?? '' );
+		$image_width    = (int)    ( $data['image_width']  ?? 0 );
+		$word_count     = (int)    ( $data['word_count']   ?? 0 );
+		$date           = (string) ( $data['date']         ?? '' );
+		$modified       = (string) ( $data['modified']     ?? '' );
+		$categories     = (array)  ( $data['categories']   ?? [] );
+		$tags           = (array)  ( $data['tags']         ?? [] );
+
+		$add = function ( string $id, string $label, bool $passed, int $pts, string $reco ) use ( &$checks, &$total ) {
+			$checks[] = $this->make_check( $id, $label, $passed, $passed ? $pts : 0, $pts, $passed ? '' : $reco );
+			if ( $passed ) {
+				$total += $pts;
+			}
+		};
+
+		$headline_ok = $title !== '' && mb_strlen( $title ) <= 110;
+		$add( 'post_headline',       'Nagłówek (headline)',          $headline_ok,                       15, 'Nagłówek musi być niepusty i ≤ 110 znaków.' );
+		$add( 'post_url',            'URL kanoniczny',               $url !== '',                        10, 'Ustaw URL postu.' );
+		$add( 'post_date_published', 'Data publikacji (ISO 8601)',   $date !== '' && $this->is_valid_iso8601( $date ),      10, 'Brakuje poprawnej datePublished.' );
+		$add( 'post_date_modified',  'Data modyfikacji (ISO 8601)',  $modified !== '' && $this->is_valid_iso8601( $modified ), 10, 'Brakuje poprawnej dateModified.' );
+		$add( 'post_image',          'Obraz ≥ 1200px',                $image_url !== '' && $image_width >= 1200,             15, 'Dodaj obraz o szerokości co najmniej 1200px.' );
+		$add( 'post_author',         'Autor',                         $author_name !== '',                                    10, 'Przypisz autora.' );
+		$add( 'post_description',    'Opis (excerpt)',                $excerpt !== '',                                        5,  'Dodaj zajawkę (excerpt).' );
+		$add( 'post_categories',     'Kategoria (articleSection)',    ! empty( $categories ),                                  5,  'Przypisz kategorię.' );
+		$add( 'post_tags',           'Tagi (keywords)',               ! empty( $tags ),                                        5,  'Dodaj tagi.' );
+		$add( 'post_word_count',     'wordCount > 300',               $word_count > 300,                                       5,  "Treść ma {$word_count} słów; minimum 300." );
+		$add( 'post_in_language',    'Język (inLanguage)',            ! empty( $data['language'] ?? null ) || isset( $data['post_id'] ), 5,  'Ustaw locale.' );
+		$add( 'post_publisher',      'Publisher',                     ! empty( $data['publisher'] ?? null ) || isset( $data['post_id'] ), 5, 'Ustaw publisher.' );
+
+		return [
+			'score'           => max( 0, min( 100, $total ) ),
+			'checks'          => $checks,
+			'recommendations' => array_values( array_filter( array_map( fn( $c ) => $c['recommendation'], $checks ) ) ),
+		];
+	}
+
+	/**
+	 * Score an author from a flat data array.
+	 */
+	public function calculate_author_score( array $data ): array {
+		$checks = [];
+		$total  = 0;
+
+		$add = function ( string $id, string $label, bool $passed, int $pts, string $reco ) use ( &$checks, &$total ) {
+			$checks[] = $this->make_check( $id, $label, $passed, $passed ? $pts : 0, $pts, $passed ? '' : $reco );
+			if ( $passed ) {
+				$total += $pts;
+			}
+		};
+
+		$display_name = (string) ( $data['display_name'] ?? '' );
+		$description  = (string) ( $data['description']  ?? '' );
+		$user_url     = (string) ( $data['user_url']     ?? '' );
+		$avatar_url   = (string) ( $data['avatar_url']   ?? '' );
+		$social_links = (array)  ( $data['social_links'] ?? [] );
+		$same_as      = (array)  ( $data['same_as']      ?? [] );
+
+		$add( 'author_display_name', 'Nazwa wyświetlana', $display_name !== '',         15, 'Ustaw display_name.' );
+		$add( 'author_bio',          'Biografia',         mb_strlen( $description ) >= 50, 20, 'Dodaj biografię ≥ 50 znaków.' );
+		$add( 'author_url',          'URL autora',        $user_url !== '',              10, 'Ustaw URL autora.' );
+		$add( 'author_avatar',       'Avatar',            $avatar_url !== '',            15, 'Dodaj avatar.' );
+		$add( 'author_social',       'Social profiles',   ! empty( $social_links ),      15, 'Dodaj social profile.' );
+		$add( 'author_sameas',       'sameAs (linkedin/wikidata)', ! empty( $same_as ), 25, 'Dodaj LinkedIn/Wikidata do sameAs.' );
+
+		return [
+			'score'           => max( 0, min( 100, $total ) ),
+			'checks'          => $checks,
+			'recommendations' => array_values( array_filter( array_map( fn( $c ) => $c['recommendation'], $checks ) ) ),
+		];
 	}
 
 	// =========================================================================

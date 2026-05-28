@@ -24,6 +24,12 @@ class Ligase_Plugin {
             'includes/class-suppressor.php',
             'includes/class-cache-bypass.php',
             'includes/class-score.php',
+            // Contract-driven field system — must load before type-classes and generator
+            // so types can opt into resolver-based building (and readiness can introspect).
+            'includes/class-field-contract.php',
+            'includes/class-field-resolver.php',
+            'includes/class-readiness.php',
+            'includes/class-readiness-panel.php',
             'includes/types/class-localbusiness.php',
             'includes/types/class-blogposting.php',
             'includes/types/class-organization.php',
@@ -43,6 +49,10 @@ class Ligase_Plugin {
             'includes/types/class-audioobject.php',
             'includes/types/class-course.php',
             'includes/types/class-event.php',
+            'includes/types/class-product.php',
+            'includes/types/class-recipe.php',
+            'includes/types/class-jobposting.php',
+            'includes/types/class-discussionforumposting.php',
             'includes/class-generator.php',
             'includes/class-output.php',
             'includes/class-auditor.php',
@@ -81,6 +91,10 @@ class Ligase_Plugin {
     }
 
     private function init_hooks(): void {
+        // Register Article image variants (1:1, 4:3, 16:9) — Google rich result for Article
+        // recommends supplying all three so it can pick the best ratio per SERP feature.
+        add_action( 'after_setup_theme', [ $this, 'register_image_sizes' ] );
+
         // Suppress other SEO plugins early (before they register wp_head output)
         add_action( 'wp_loaded', [ Ligase_Output::class, 'maybe_suppress_early' ] );
 
@@ -88,12 +102,37 @@ class Ligase_Plugin {
 
         add_action( 'save_post',      [ Ligase_Cache::class, 'invalidate_post' ] );
         add_action( 'save_post',      function() { delete_transient( 'ligase_site_score' ); } );
-        add_action( 'updated_option', [ Ligase_Cache::class, 'invalidate_all' ] );
+
+        // Scope cache invalidation to plugin-relevant options only. The previous unconditional
+        // 'updated_option' listener fired a `LIKE 'ligase_%' DELETE` on every single WP option
+        // change — including transient_* and theme_mod writes — turning every page-save into
+        // a wp_options table scan. Now: invalidate full cache only when ligase_options changes.
         add_action( 'updated_option', function( string $option ) {
             if ( $option === 'ligase_options' ) {
+                Ligase_Cache::invalidate_all();
                 delete_transient( 'ligase_site_score' );
             }
-        } );
+        }, 10, 1 );
+
+        // WooCommerce — invalidate product schema cache on price/stock changes. Without this
+        // Google sees the cached price/availability for up to 12h, which is unacceptable
+        // for ecommerce (sales / out-of-stock listings keep showing the wrong info).
+        // Each hook routes through a single helper so we can later add deferred invalidation.
+        if ( class_exists( 'WooCommerce' ) || defined( 'WC_VERSION' ) ) {
+            $wc_invalidate = function ( $product_or_id ) {
+                $post_id = is_object( $product_or_id ) && method_exists( $product_or_id, 'get_id' )
+                    ? (int) $product_or_id->get_id()
+                    : (int) $product_or_id;
+                if ( $post_id > 0 ) {
+                    Ligase_Cache::invalidate_post( $post_id );
+                }
+            };
+            add_action( 'woocommerce_after_product_object_save',  $wc_invalidate, 10, 1 );
+            add_action( 'woocommerce_product_set_stock_status',   $wc_invalidate, 10, 1 );
+            add_action( 'woocommerce_variation_set_stock_status', $wc_invalidate, 10, 1 );
+            add_action( 'woocommerce_product_set_stock',          $wc_invalidate, 10, 1 );
+            add_action( 'woocommerce_updated_product_stock',      $wc_invalidate, 10, 1 );
+        }
         add_action( 'profile_update',      function( int $uid ) { delete_transient( 'ligase_author_score_' . $uid ); } );
         add_action( 'updated_user_meta',   function( $meta_id, $uid ) { delete_transient( 'ligase_author_score_' . $uid ); }, 10, 2 );
 
@@ -106,6 +145,10 @@ class Ligase_Plugin {
 
         add_action( 'init', [ $this, 'load_textdomain' ] );
         add_action( 'init', [ $this, 'register_blocks' ] );
+
+        // Extract FAQ/HowTo block data into post meta on save (NOT on render — frontend
+        // render must never write to DB).
+        add_action( 'save_post', [ $this, 'sync_block_meta' ], 20, 2 );
 
         // Multilingual support (WPML / Polylang)
         if ( class_exists( 'Ligase_Multilingual' ) ) {
@@ -123,6 +166,14 @@ class Ligase_Plugin {
             new Ligase_Ajax();
         }
 
+        // Contract-driven readiness panel + AJAX
+        if ( class_exists( 'Ligase_Readiness' ) ) {
+            Ligase_Readiness::register_ajax();
+        }
+        if ( class_exists( 'Ligase_Readiness_Panel' ) ) {
+            Ligase_Readiness_Panel::register();
+        }
+
         if ( is_admin() && class_exists( 'Ligase_Admin' ) ) {
             $admin = new Ligase_Admin( LIGASE_VERSION, LIGASE_URL, LIGASE_DIR );
             $admin->init();
@@ -137,16 +188,25 @@ class Ligase_Plugin {
         );
     }
 
+    /**
+     * Register Article image crop sizes used by Ligase_Type_BlogPosting::build_images.
+     * Existing uploads need re-generation (e.g. via the `regenerate-thumbnails` plugin
+     * or `wp media regenerate`) — newly uploaded images get the crops automatically.
+     */
+    public function register_image_sizes(): void {
+        if ( ! function_exists( 'add_image_size' ) ) {
+            return;
+        }
+        add_image_size( 'ligase_1x1',  1200, 1200, true );
+        add_image_size( 'ligase_4x3',  1200, 900,  true );
+        add_image_size( 'ligase_16x9', 1200, 675,  true );
+    }
+
     public function register_blocks(): void {
         $faq_path = LIGASE_DIR . 'blocks/faq/block.json';
         if ( file_exists( $faq_path ) ) {
             register_block_type( LIGASE_DIR . 'blocks/faq/', [
-                'uses_context' => [ 'postId' ],
                 'render_callback' => function( array $attrs, string $content, $block ): string {
-                    $post_id = $block->context['postId'] ?? get_the_ID();
-                    if ( $post_id && ! empty( $attrs['items'] ) ) {
-                        update_post_meta( $post_id, '_ligase_faq_items', $attrs['items'] );
-                    }
                     return '';
                 },
             ] );
@@ -155,15 +215,66 @@ class Ligase_Plugin {
         $howto_path = LIGASE_DIR . 'blocks/howto/block.json';
         if ( file_exists( $howto_path ) ) {
             register_block_type( LIGASE_DIR . 'blocks/howto/', [
-                'uses_context' => [ 'postId' ],
                 'render_callback' => function( array $attrs, string $content, $block ): string {
-                    $post_id = $block->context['postId'] ?? get_the_ID();
-                    if ( $post_id && ! empty( $attrs['steps'] ) ) {
-                        update_post_meta( $post_id, '_ligase_howto', $attrs );
-                    }
                     return '';
                 },
             ] );
+        }
+    }
+
+    /**
+     * Parse FAQ/HowTo blocks out of the post content on save and store their attrs
+     * as post meta. Keeps the frontend render path read-only and idempotent.
+     */
+    public function sync_block_meta( int $post_id, $post ): void {
+        if ( ! $post instanceof WP_Post ) {
+            return;
+        }
+        if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+            return;
+        }
+        if ( wp_is_post_revision( $post_id ) ) {
+            return;
+        }
+        if ( ! current_user_can( 'edit_post', $post_id ) ) {
+            return;
+        }
+
+        $blocks = parse_blocks( $post->post_content );
+        $found_faq   = false;
+        $found_howto = false;
+
+        foreach ( $this->iter_blocks( $blocks ) as $block ) {
+            $name  = $block['blockName'] ?? '';
+            $attrs = $block['attrs']     ?? [];
+
+            if ( $name === 'ligase/faq' && ! empty( $attrs['items'] ) && is_array( $attrs['items'] ) ) {
+                update_post_meta( $post_id, '_ligase_faq_items', $attrs['items'] );
+                $found_faq = true;
+            }
+            if ( $name === 'ligase/howto' && ! empty( $attrs['steps'] ) && is_array( $attrs['steps'] ) ) {
+                update_post_meta( $post_id, '_ligase_howto', $attrs );
+                $found_howto = true;
+            }
+        }
+
+        if ( ! $found_faq ) {
+            delete_post_meta( $post_id, '_ligase_faq_items' );
+        }
+        if ( ! $found_howto ) {
+            delete_post_meta( $post_id, '_ligase_howto' );
+        }
+    }
+
+    /**
+     * Yield blocks recursively (handles innerBlocks).
+     */
+    private function iter_blocks( array $blocks ): \Generator {
+        foreach ( $blocks as $block ) {
+            yield $block;
+            if ( ! empty( $block['innerBlocks'] ) && is_array( $block['innerBlocks'] ) ) {
+                yield from $this->iter_blocks( $block['innerBlocks'] );
+            }
         }
     }
 

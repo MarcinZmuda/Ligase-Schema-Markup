@@ -1,4 +1,19 @@
 <?php
+/**
+ * Ligase - Review schema type
+ *
+ * Pros/cons hint: Google's pros & cons rich result is ONLY granted for editorial
+ * product reviews (a dedicated review article that critiques the product). It is
+ * NOT granted for:
+ *   - Product shop pages (no rich result; just emits valid markup)
+ *   - User review aggregates (use Product.aggregateRating instead)
+ *
+ * If you enable this type on a product shop page, the markup is still valid but
+ * Google will not show the pros/cons enhancement. Use it on standalone "We tested X"
+ * articles where the page IS the review.
+ *
+ * @package Ligase
+ */
 
 defined( 'ABSPATH' ) || exit;
 
@@ -45,10 +60,10 @@ class Ligase_Type_Review {
             ],
         ];
 
-        $schema['name'] = esc_html( $review_data['name'] ?? get_the_title( $post_id ) );
+        $schema['name'] = wp_strip_all_tags( $review_data['name'] ?? get_the_title( $post_id ) );
 
         if ( ! empty( $review_data['body'] ) ) {
-            $schema['reviewBody'] = esc_html( mb_substr( $review_data['body'], 0, 500 ) );
+            $schema['reviewBody'] = wp_strip_all_tags( mb_substr( $review_data['body'], 0, 500 ) );
         }
 
         if ( ! empty( $review_data['item_name'] ) ) {
@@ -59,7 +74,7 @@ class Ligase_Type_Review {
             }
             $schema['itemReviewed'] = [
                 '@type' => $item_type,
-                'name'  => esc_html( $review_data['item_name'] ),
+                'name'  => wp_strip_all_tags( $review_data['item_name'] ),
             ];
         }
 

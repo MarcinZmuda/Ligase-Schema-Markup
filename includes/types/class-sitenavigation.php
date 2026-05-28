@@ -105,7 +105,7 @@ class Ligase_Type_SiteNavigationElement {
 			$list_items[] = array(
 				'@type'    => 'SiteNavigationElement',
 				'position' => $position++,
-				'name'     => esc_html( $item->title ),
+				'name'     => wp_strip_all_tags( $item->title ),
 				'url'      => $url,
 			);
 		}
@@ -121,7 +121,7 @@ class Ligase_Type_SiteNavigationElement {
 		$schema = array(
 			'@type'           => 'SiteNavigationElement',
 			'@id'             => home_url( '/#nav-' . sanitize_key( $location ) ),
-			'name'            => esc_html( $nav_name ),
+			'name'            => wp_strip_all_tags( $nav_name ),
 			'url'             => esc_url( home_url( '/' ) ),
 			'hasPart'         => $list_items,
 		);

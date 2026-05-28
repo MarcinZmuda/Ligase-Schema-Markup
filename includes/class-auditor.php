@@ -179,7 +179,10 @@ class Ligase_Auditor {
 
 				case 'supplement':
 					$supplemented = $this->supplement_schema( $schema );
-					$new_json     = wp_json_encode( $supplemented, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+					$new_json     = wp_json_encode( $supplemented, JSON_UNESCAPED_UNICODE );
+					// Defense in depth: scrub any literal </script> from the encoded JSON
+					// before wrapping it back into a <script> tag.
+					$new_json     = str_replace( [ '</', '<!--' ], [ '<\/', '<\!--' ], $new_json );
 					$new_tag      = '<script type="application/ld+json">' . $new_json . '</script>';
 					$buffer       = str_replace( $full_tag, $new_tag, $buffer );
 
@@ -200,67 +203,178 @@ class Ligase_Auditor {
 	/**
 	 * Score a schema array on a 0-100 scale.
 	 *
+	 * Scoring rubric is type-aware: Article-family types are scored against an
+	 * Article rubric (headline/datePublished/author/image/publisher); Event/Product/
+	 * LocalBusiness/Recipe/FAQ etc. are scored against their own required fields.
+	 * Using the Article rubric for every type would unfairly score Event at 0 and
+	 * trigger destructive auto-replacement.
+	 *
 	 * @param array $schema Decoded JSON-LD schema.
 	 *
 	 * @return int Score clamped between 0 and 100.
 	 */
 	public function score( array $schema ): int {
+		$type = '';
+		if ( ! empty( $schema['@type'] ) ) {
+			$type = is_array( $schema['@type'] ) ? (string) reset( $schema['@type'] ) : (string) $schema['@type'];
+		}
+
+		$article_types = [ 'Article', 'BlogPosting', 'NewsArticle', 'TechArticle', 'ScholarlyArticle', 'Report' ];
+
+		if ( in_array( $type, $article_types, true ) || $type === '' ) {
+			return $this->score_article( $schema );
+		}
+
+		switch ( $type ) {
+			case 'Event':
+				return $this->score_event( $schema );
+			case 'Product':
+				return $this->score_product( $schema );
+			case 'LocalBusiness':
+			case 'Restaurant':
+			case 'Store':
+			case 'Hotel':
+				return $this->score_local_business( $schema );
+			case 'Recipe':
+				return $this->score_recipe( $schema );
+			case 'FAQPage':
+				return $this->score_faqpage( $schema );
+			case 'HowTo':
+				return $this->score_howto( $schema );
+			case 'VideoObject':
+				return $this->score_video( $schema );
+			case 'Organization':
+			case 'Person':
+			case 'WebSite':
+			case 'BreadcrumbList':
+				return $this->score_generic_entity( $schema );
+		}
+
+		return $this->score_generic_entity( $schema );
+	}
+
+	private function score_article( array $schema ): int {
 		$points = 0;
+		if ( ! empty( $schema['headline'] ) )      { $points += 15; }
+		if ( ! empty( $schema['datePublished'] ) ) { $points += 15; }
+		if ( ! empty( $schema['dateModified'] ) )  { $points += 10; }
+		if ( ! empty( $schema['author']['name'] ) || $this->nested_has( $schema, 'author', 'name' ) ) { $points += 15; }
+		if ( ! empty( $schema['image'] ) )         { $points += 15; }
+		if ( ! empty( $schema['publisher'] ) )     { $points += 10; }
+		if ( ! empty( $schema['author']['@id'] ) || $this->nested_has( $schema, 'author', '@id' ) )   { $points += 10; }
+		if ( ! empty( $schema['@id'] ) )           { $points += 5; }
+		if ( ! empty( $schema['description'] ) )   { $points += 5; }
 
-		// Positive signals.
-		if ( ! empty( $schema['headline'] ) ) {
-			$points += 15;
+		if ( ! empty( $schema['headline'] ) && mb_strlen( $schema['headline'] ) > 110 ) { $points -= 20; }
+		if ( ! empty( $schema['datePublished'] ) && ! $this->is_valid_iso8601( $schema['datePublished'] ) ) { $points -= 20; }
+		if ( ! empty( $schema['dateModified'] ) && ! $this->is_valid_iso8601( $schema['dateModified'] ) )   { $points -= 20; }
+		if ( $this->image_width_below( $schema, 696 ) ) { $points -= 10; }
+
+		return max( 0, min( 100, $points ) );
+	}
+
+	private function score_event( array $schema ): int {
+		$points = 0;
+		if ( ! empty( $schema['name'] ) )                 { $points += 15; }
+		if ( ! empty( $schema['startDate'] ) )            { $points += 20; }
+		if ( ! empty( $schema['location'] ) )             { $points += 20; }
+		if ( ! empty( $schema['eventAttendanceMode'] ) )  { $points += 10; }
+		if ( ! empty( $schema['organizer'] ) )            { $points += 10; }
+		if ( ! empty( $schema['offers'] ) )               { $points += 10; }
+		if ( ! empty( $schema['image'] ) )                { $points += 10; }
+		if ( ! empty( $schema['description'] ) )          { $points += 5;  }
+		if ( ! empty( $schema['startDate'] ) && ! $this->is_valid_iso8601( $schema['startDate'] ) ) { $points -= 20; }
+		return max( 0, min( 100, $points ) );
+	}
+
+	private function score_product( array $schema ): int {
+		$points = 0;
+		if ( ! empty( $schema['name'] ) )            { $points += 15; }
+		if ( ! empty( $schema['image'] ) )           { $points += 15; }
+		if ( ! empty( $schema['description'] ) )     { $points += 10; }
+		if ( ! empty( $schema['offers'] ) )          { $points += 20; }
+		if ( ! empty( $schema['brand'] ) )           { $points += 10; }
+		if ( ! empty( $schema['sku'] ) || ! empty( $schema['gtin'] ) || ! empty( $schema['mpn'] ) ) { $points += 15; }
+		if ( ! empty( $schema['aggregateRating'] ) || ! empty( $schema['review'] ) ) { $points += 15; }
+		return max( 0, min( 100, $points ) );
+	}
+
+	private function score_local_business( array $schema ): int {
+		$points = 0;
+		if ( ! empty( $schema['name'] ) )                  { $points += 15; }
+		if ( ! empty( $schema['address'] ) )               { $points += 20; }
+		if ( ! empty( $schema['telephone'] ) )             { $points += 10; }
+		if ( ! empty( $schema['url'] ) )                   { $points += 10; }
+		if ( ! empty( $schema['openingHoursSpecification'] ) || ! empty( $schema['openingHours'] ) ) { $points += 15; }
+		if ( ! empty( $schema['geo'] ) )                   { $points += 10; }
+		if ( ! empty( $schema['image'] ) )                 { $points += 10; }
+		if ( ! empty( $schema['priceRange'] ) )            { $points += 5;  }
+		if ( ! empty( $schema['sameAs'] ) )                { $points += 5;  }
+		return max( 0, min( 100, $points ) );
+	}
+
+	private function score_recipe( array $schema ): int {
+		$points = 0;
+		if ( ! empty( $schema['name'] ) )               { $points += 10; }
+		if ( ! empty( $schema['image'] ) )              { $points += 15; }
+		if ( ! empty( $schema['recipeIngredient'] ) )   { $points += 20; }
+		if ( ! empty( $schema['recipeInstructions'] ) ) { $points += 20; }
+		if ( ! empty( $schema['totalTime'] ) || ! empty( $schema['cookTime'] ) || ! empty( $schema['prepTime'] ) ) { $points += 10; }
+		if ( ! empty( $schema['author'] ) )             { $points += 10; }
+		if ( ! empty( $schema['nutrition'] ) )          { $points += 5;  }
+		if ( ! empty( $schema['aggregateRating'] ) )    { $points += 10; }
+		return max( 0, min( 100, $points ) );
+	}
+
+	private function score_faqpage( array $schema ): int {
+		$points = 0;
+		if ( ! empty( $schema['mainEntity'] ) && is_array( $schema['mainEntity'] ) ) {
+			$n = count( $schema['mainEntity'] );
+			$points += min( 60, $n * 15 ); // up to 4 visible Q&A
+			$with_answer = 0;
+			foreach ( $schema['mainEntity'] as $q ) {
+				if ( ! empty( $q['acceptedAnswer']['text'] ) ) { ++$with_answer; }
+			}
+			$points += min( 30, $with_answer * 10 );
 		}
+		if ( ! empty( $schema['@id'] ) )       { $points += 5; }
+		if ( ! empty( $schema['inLanguage'] ) ){ $points += 5; }
+		return max( 0, min( 100, $points ) );
+	}
 
-		if ( ! empty( $schema['datePublished'] ) ) {
-			$points += 15;
+	private function score_howto( array $schema ): int {
+		$points = 0;
+		if ( ! empty( $schema['name'] ) )  { $points += 15; }
+		if ( ! empty( $schema['image'] ) ) { $points += 15; }
+		if ( ! empty( $schema['step'] ) && is_array( $schema['step'] ) ) {
+			$points += min( 50, count( $schema['step'] ) * 10 );
 		}
+		if ( ! empty( $schema['totalTime'] ) ) { $points += 10; }
+		if ( ! empty( $schema['@id'] ) )       { $points += 10; }
+		return max( 0, min( 100, $points ) );
+	}
 
-		if ( ! empty( $schema['dateModified'] ) ) {
-			$points += 10;
-		}
+	private function score_video( array $schema ): int {
+		$points = 0;
+		if ( ! empty( $schema['name'] ) )         { $points += 15; }
+		if ( ! empty( $schema['description'] ) )  { $points += 15; }
+		if ( ! empty( $schema['thumbnailUrl'] ) ) { $points += 20; }
+		if ( ! empty( $schema['uploadDate'] ) )   { $points += 15; }
+		if ( ! empty( $schema['contentUrl'] ) || ! empty( $schema['embedUrl'] ) ) { $points += 20; }
+		if ( ! empty( $schema['duration'] ) )     { $points += 10; }
+		if ( ! empty( $schema['@id'] ) )          { $points += 5; }
+		return max( 0, min( 100, $points ) );
+	}
 
-		if ( ! empty( $schema['author']['name'] ) || $this->nested_has( $schema, 'author', 'name' ) ) {
-			$points += 15;
-		}
-
-		if ( ! empty( $schema['image'] ) ) {
-			$points += 15;
-		}
-
-		if ( ! empty( $schema['publisher'] ) ) {
-			$points += 10;
-		}
-
-		if ( ! empty( $schema['author']['@id'] ) || $this->nested_has( $schema, 'author', '@id' ) ) {
-			$points += 10;
-		}
-
-		if ( ! empty( $schema['@id'] ) ) {
-			$points += 5;
-		}
-
-		if ( ! empty( $schema['description'] ) ) {
-			$points += 5;
-		}
-
-		// Penalties.
-		if ( ! empty( $schema['headline'] ) && mb_strlen( $schema['headline'] ) > 110 ) {
-			$points -= 20;
-		}
-
-		if ( ! empty( $schema['datePublished'] ) && ! $this->is_valid_iso8601( $schema['datePublished'] ) ) {
-			$points -= 20;
-		}
-
-		if ( ! empty( $schema['dateModified'] ) && ! $this->is_valid_iso8601( $schema['dateModified'] ) ) {
-			$points -= 20;
-		}
-
-		if ( $this->image_width_below( $schema, 696 ) ) {
-			$points -= 10;
-		}
-
+	private function score_generic_entity( array $schema ): int {
+		$points = 0;
+		if ( ! empty( $schema['@type'] ) )       { $points += 15; }
+		if ( ! empty( $schema['name'] ) )        { $points += 20; }
+		if ( ! empty( $schema['@id'] ) )         { $points += 15; }
+		if ( ! empty( $schema['url'] ) )         { $points += 15; }
+		if ( ! empty( $schema['description'] ) ) { $points += 10; }
+		if ( ! empty( $schema['sameAs'] ) )      { $points += 15; }
+		if ( ! empty( $schema['image'] ) || ! empty( $schema['logo'] ) ) { $points += 10; }
 		return max( 0, min( 100, $points ) );
 	}
 
@@ -342,6 +456,9 @@ class Ligase_Auditor {
 				'post_status'    => 'publish',
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
 			)
 		);
 
@@ -380,9 +497,10 @@ class Ligase_Auditor {
 		}
 
 		$schema_blocks = $this->get_jsonld_for_post( $post_id );
+		$backup_payload = ! empty( $schema_blocks[0] ) ? $schema_blocks[0] : [];
 
 		// Atomic-ish update: store backup and flag together
-		$backup_saved = update_post_meta( $post_id, '_ligase_replaced_schema', wp_json_encode( $schema_blocks[0] ?? $schema ) );
+		$backup_saved = update_post_meta( $post_id, '_ligase_replaced_schema', wp_json_encode( $backup_payload ) );
 		if ( $backup_saved ) {
 			update_post_meta( $post_id, '_ligase_needs_own_schema', '1' );
 		} else {
@@ -393,6 +511,98 @@ class Ligase_Auditor {
 		Ligase_Logger::info( "Marked post {$post_id} for schema replacement." );
 
 		return true;
+	}
+
+	/**
+	 * Apply supplement mode for a single post — additive only, never overwrites.
+	 *
+	 * Stores the fields Ligase would add into a meta key. The Output class reads this
+	 * and emits an additional <script type="application/ld+json"> block alongside the
+	 * existing competitor schema. Because supplements use stable @id references, Google
+	 * (and AI engines) will merge them with the existing graph rather than treat them
+	 * as duplicates.
+	 *
+	 * @param int $post_id
+	 * @return bool
+	 */
+	public function apply_supplement( int $post_id ): bool {
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			Ligase_Logger::warning( "Insufficient permissions to supplement schema on post {$post_id}." );
+			return false;
+		}
+
+		$scan = $this->scan_post( $post_id );
+		if ( $scan['score'] >= $this->threshold ) {
+			return false;
+		}
+
+		$existing = $this->get_jsonld_for_post( $post_id );
+		$existing = ! empty( $existing[0] ) ? $existing[0] : [];
+
+		// Compute the diff: which fields would Ligase add that the existing schema lacks?
+		$supplemented = $this->supplement_schema( $existing );
+		$additions    = [];
+		foreach ( $supplemented as $key => $value ) {
+			if ( empty( $existing[ $key ] ) && ! empty( $value ) ) {
+				$additions[ $key ] = $value;
+			}
+		}
+
+		if ( empty( $additions ) ) {
+			return false;
+		}
+
+		update_post_meta( $post_id, '_ligase_supplement_additions', wp_json_encode( $additions ) );
+		update_post_meta( $post_id, '_ligase_supplement_mode', '1' );
+
+		Ligase_Logger::info( "Supplement queued for post {$post_id}: " . implode( ',', array_keys( $additions ) ) );
+
+		return true;
+	}
+
+	/**
+	 * Restore previously-replaced schema for a post: clears the "needs own schema"
+	 * flag and removes the backup (so the next page render reverts to whatever
+	 * other plugin's schema is now produced).
+	 *
+	 * The backup meta is preserved as a separate restore payload so the user can
+	 * see what was replaced — admin UI surfaces it via the auditor view.
+	 *
+	 * @param int $post_id
+	 * @return bool True if a replacement existed and was restored.
+	 */
+	public function restore_replacement( int $post_id ): bool {
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			Ligase_Logger::warning( "Insufficient permissions to restore schema for post {$post_id}." );
+			return false;
+		}
+
+		$had_flag = '1' === get_post_meta( $post_id, '_ligase_needs_own_schema', true );
+
+		delete_post_meta( $post_id, '_ligase_needs_own_schema' );
+		// Keep _ligase_replaced_schema as a record of what was replaced; users can clear it
+		// from the auditor view explicitly.
+
+		if ( $had_flag ) {
+			Ligase_Logger::info( "Restored original schema for post {$post_id}." );
+		}
+
+		return $had_flag;
+	}
+
+	/**
+	 * Get the previously-stored backup of replaced schema (for diff display in admin).
+	 *
+	 * @param int $post_id
+	 * @return array|null
+	 */
+	public function get_replaced_backup( int $post_id ): ?array {
+		$raw = get_post_meta( $post_id, '_ligase_replaced_schema', true );
+		if ( empty( $raw ) ) {
+			return null;
+		}
+		$decoded = json_decode( (string) $raw, true );
+		return is_array( $decoded ) ? $decoded : null;
 	}
 
 	/**
@@ -443,6 +653,61 @@ class Ligase_Auditor {
 		Ligase_Logger::info( "Consumed replacement flag for post {$post_id}." );
 
 		return true;
+	}
+
+	/**
+	 * Pure-function audit of a schema array. WP-independent: takes a schema, returns the
+	 * scored result and (for replace/supplement mode) the modified schema. Does NOT
+	 * write to post meta or touch wp_head — that's reserved for the apply_*() methods.
+	 *
+	 * @param array  $schema The decoded JSON-LD to audit.
+	 * @param string $mode   'scan' | 'supplement' | 'replace'
+	 * @param array  $opts   ['threshold' => int]
+	 * @return array{schema: array, score: int, mode: string, action: string, below_threshold: bool, issues: array}
+	 */
+	public function audit( array $schema, string $mode = 'scan', array $opts = [] ): array {
+		$mode      = in_array( $mode, self::ALLOWED_MODES, true ) ? $mode : 'scan';
+		$threshold = isset( $opts['threshold'] ) ? max( 0, min( 100, (int) $opts['threshold'] ) ) : $this->threshold;
+
+		$score           = $this->score( $schema );
+		$below_threshold = $score < $threshold;
+		$issues          = $this->collect_issues( $schema );
+
+		$action = 'none';
+		$out    = $schema;
+		if ( $below_threshold ) {
+			switch ( $mode ) {
+				case 'supplement':
+					$out    = $this->supplement_schema( $schema );
+					$action = 'supplement';
+					break;
+				case 'replace':
+					$action = 'replace';
+					break;
+				case 'scan':
+				default:
+					$action = 'flag';
+					break;
+			}
+		}
+
+		return [
+			'schema'          => $out,
+			'score'           => $score,
+			'mode'            => $mode,
+			'action'          => $action,
+			'below_threshold' => $below_threshold,
+			'issues'          => $issues,
+		];
+	}
+
+	/**
+	 * Alias for get_detected_plugins(). Provided for API symmetry with the audit() method.
+	 *
+	 * @return array<string, string>
+	 */
+	public function detect_plugins(): array {
+		return $this->get_detected_plugins();
 	}
 
 	/**

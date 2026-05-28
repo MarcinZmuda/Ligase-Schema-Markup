@@ -29,8 +29,8 @@ class Ligase_Type_QAPage {
             '@id'         => esc_url( get_permalink() ) . '#qapage',
             'mainEntity'  => [
                 '@type'          => 'Question',
-                'name'           => esc_html( $question ),
-                'text'           => esc_html( $question ),
+                'name'           => wp_strip_all_tags( $question ),
+                'text'           => wp_strip_all_tags( $question ),
                 'dateCreated'    => get_the_date( 'c' ),
                 'author'         => [ '@id' => home_url( '/#author-' . $author_id ) ],
                 'answerCount'    => 1,

@@ -37,13 +37,21 @@ class Ligase_Type_VideoObject {
     }
 
     private function build_youtube( string $vid, int $post_id ): array {
+        // hqdefault.jpg is guaranteed to exist for every YouTube video; maxresdefault.jpg
+        // is 404 for ~30% of videos (only generated when source >= 1280x720). Use both as
+        // an array so consumers can fall back, with hqdefault listed first as the safe default.
+        $thumbnails = [
+            "https://img.youtube.com/vi/{$vid}/hqdefault.jpg",
+            "https://img.youtube.com/vi/{$vid}/maxresdefault.jpg",
+        ];
+
         $schema = [
             '@type'        => 'VideoObject',
             '@id'          => esc_url( get_permalink( $post_id ) ) . '#video',
-            'name'         => esc_html( get_the_title( $post_id ) ),
-            'description'  => esc_html( wp_strip_all_tags( get_the_excerpt( $post_id ) ) ),
+            'name'         => wp_strip_all_tags( get_the_title( $post_id ) ),
+            'description'  => wp_strip_all_tags( wp_strip_all_tags( get_the_excerpt( $post_id ) ) ),
             'inLanguage'   => str_replace( '_', '-', get_locale() ),
-            'thumbnailUrl' => "https://img.youtube.com/vi/{$vid}/maxresdefault.jpg",
+            'thumbnailUrl' => $thumbnails,
             'uploadDate'   => get_the_date( 'c', $post_id ),
             'embedUrl'     => "https://www.youtube.com/embed/{$vid}",
             'contentUrl'   => "https://www.youtube.com/watch?v={$vid}",
@@ -61,13 +69,13 @@ class Ligase_Type_VideoObject {
     private function build_from_meta( array $meta, int $post_id ): array {
         $schema = [
             '@type'        => 'VideoObject',
-            'name'         => esc_html( $meta['name'] ?? get_the_title( $post_id ) ),
+            'name'         => wp_strip_all_tags( $meta['name'] ?? get_the_title( $post_id ) ),
             'thumbnailUrl' => esc_url( $meta['thumbnail'] ?? '' ),
-            'uploadDate'   => esc_html( $meta['upload_date'] ?? get_the_date( 'c', $post_id ) ),
+            'uploadDate'   => wp_strip_all_tags( $meta['upload_date'] ?? get_the_date( 'c', $post_id ) ),
             'embedUrl'     => esc_url( $meta['embed_url'] ),
         ];
         if ( ! empty( $meta['duration'] ) && preg_match( '/^P(?:\d+[YMWD])*(?:T(?:\d+[HMS])*)?$/', $meta['duration'] ) ) {
-            $schema['duration'] = esc_html( $meta['duration'] );
+            $schema['duration'] = wp_strip_all_tags( $meta['duration'] );
         }
         return $schema;
     }

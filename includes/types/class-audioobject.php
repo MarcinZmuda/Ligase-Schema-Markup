@@ -53,8 +53,8 @@ class Ligase_Type_AudioObject {
             return [
                 'type'      => 'anchor',
                 'id'        => $m[1],
-                'embed_url' => 'https://anchor.fm/' . $m[0],
-                'url'       => 'https://anchor.fm/' . $m[0],
+                'embed_url' => 'https://' . $m[0],
+                'url'       => 'https://' . $m[0],
             ];
         }
 
@@ -65,8 +65,8 @@ class Ligase_Type_AudioObject {
         $schema = [
             '@type'       => 'AudioObject',
             '@id'         => esc_url( get_permalink( $post_id ) ) . '#audio',
-            'name'        => esc_html( get_the_title( $post_id ) ),
-            'description' => esc_html( wp_strip_all_tags( get_the_excerpt( $post_id ) ) ),
+            'name'        => wp_strip_all_tags( get_the_title( $post_id ) ),
+            'description' => wp_strip_all_tags( wp_strip_all_tags( get_the_excerpt( $post_id ) ) ),
             'inLanguage'  => str_replace( '_', '-', get_locale() ),
             'uploadDate'  => get_the_date( 'c', $post_id ),
             'contentUrl'  => esc_url( $embed['url'] ),
@@ -85,9 +85,9 @@ class Ligase_Type_AudioObject {
         $schema = [
             '@type'       => 'AudioObject',
             '@id'         => esc_url( get_permalink( $post_id ) ) . '#audio',
-            'name'        => esc_html( $meta['name'] ?? get_the_title( $post_id ) ),
+            'name'        => wp_strip_all_tags( $meta['name'] ?? get_the_title( $post_id ) ),
             'inLanguage'  => str_replace( '_', '-', get_locale() ),
-            'uploadDate'  => esc_html( $meta['upload_date'] ?? get_the_date( 'c', $post_id ) ),
+            'uploadDate'  => wp_strip_all_tags( $meta['upload_date'] ?? get_the_date( 'c', $post_id ) ),
             'contentUrl'  => esc_url( $meta['content_url'] ),
         ];
 
@@ -96,7 +96,7 @@ class Ligase_Type_AudioObject {
         }
 
         if ( ! empty( $meta['description'] ) ) {
-            $schema['description'] = esc_html( $meta['description'] );
+            $schema['description'] = wp_strip_all_tags( $meta['description'] );
         }
 
         if ( ! empty( $meta['duration'] ) && preg_match( '/^P(?:\d+[YMWD])*(?:T(?:\d+[HMS])*)?$/', $meta['duration'] ) ) {

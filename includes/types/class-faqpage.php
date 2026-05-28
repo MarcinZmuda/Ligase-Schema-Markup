@@ -27,7 +27,7 @@ class Ligase_Type_FAQPage {
             }
             $entities[] = [
                 '@type' => 'Question',
-                'name'  => esc_html( $item['question'] ),
+                'name'  => wp_strip_all_tags( $item['question'] ),
                 'acceptedAnswer' => [
                     '@type' => 'Answer',
                     'text'  => wp_kses_post( $item['answer'] ),
@@ -40,8 +40,12 @@ class Ligase_Type_FAQPage {
         }
 
         return [
-            '@type'      => 'FAQPage',
-            'mainEntity' => $entities,
+            '@type'            => 'FAQPage',
+            '@id'              => esc_url( get_permalink( $post_id ) ) . '#faq',
+            'inLanguage'       => str_replace( '_', '-', get_locale() ),
+            'isPartOf'         => [ '@id' => home_url( '/#website' ) ],
+            'mainEntityOfPage' => esc_url( get_permalink( $post_id ) ),
+            'mainEntity'       => $entities,
         ];
     }
 }

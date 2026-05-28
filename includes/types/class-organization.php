@@ -8,10 +8,16 @@ class Ligase_Type_Organization {
         $opts = get_option( 'ligase_options', [] );
         $name = ! empty( $opts['org_name'] ) ? $opts['org_name'] : get_bloginfo( 'name' );
 
+        // OnlineStore mode promotes the @type so site-level merchant policies (return,
+        // shipping) attach to the OnlineStore node and product offers can reference them
+        // by @id instead of repeating the full policy on every product.
+        $is_store  = ! empty( $opts['store_mode'] ) || class_exists( 'WooCommerce' );
+        $org_type  = $is_store ? 'OnlineStore' : 'Organization';
+
         $schema = [
-            '@type' => 'Organization',
+            '@type' => $org_type,
             '@id'   => home_url( '/#org' ),
-            'name'  => esc_html( $name ),
+            'name'  => wp_strip_all_tags( $name ),
             'url'   => esc_url( home_url( '/' ) ),
         ];
 
@@ -45,7 +51,10 @@ class Ligase_Type_Organization {
 
         $knows = $opts['knows_about'] ?? '';
         if ( $knows ) {
-            $schema['knowsAbout'] = array_map( 'trim', explode( ',', $knows ) );
+            $schema['knowsAbout'] = array_values( array_filter( array_map(
+                fn( $t ) => wp_strip_all_tags( trim( $t ) ),
+                explode( ',', $knows )
+            ) ) );
         }
 
         if ( ! empty( $opts['org_email'] ) ) {
@@ -53,16 +62,16 @@ class Ligase_Type_Organization {
         }
 
         if ( ! empty( $opts['org_phone'] ) ) {
-            $schema['telephone'] = esc_html( $opts['org_phone'] );
+            $schema['telephone'] = wp_strip_all_tags( $opts['org_phone'] );
             $schema['contactPoint'] = [
                 '@type'       => 'ContactPoint',
-                'telephone'   => esc_html( $opts['org_phone'] ),
+                'telephone'   => wp_strip_all_tags( $opts['org_phone'] ),
                 'contactType' => 'customer service',
             ];
         }
 
         if ( ! empty( $opts['org_description'] ) ) {
-            $schema['description'] = esc_html( $opts['org_description'] );
+            $schema['description'] = wp_strip_all_tags( $opts['org_description'] );
         }
 
         // founder — linked Person @id
@@ -82,7 +91,80 @@ class Ligase_Type_Organization {
             ], $authors );
         }
 
+        // Store-level merchant policies — emitted once, referenced from product Offers
+        // by @id. Saves payload + maintenance cost across thousands of products.
+        if ( $is_store ) {
+            $return_policy = $this->build_store_return_policy( $opts );
+            if ( $return_policy ) {
+                $schema['hasMerchantReturnPolicy'] = $return_policy;
+            }
+            $shipping = $this->build_store_shipping( $opts );
+            if ( $shipping ) {
+                $schema['shippingDetails'] = $shipping;
+            }
+        }
+
         return apply_filters( 'ligase_organization', $schema );
+    }
+
+    /**
+     * Build the store-wide MerchantReturnPolicy. Returns null if return_country is
+     * missing — Google requires `returnPolicyCountry` (since March 2025) and emitting
+     * the policy without it produces a Search Console warning.
+     */
+    private function build_store_return_policy( array $opts ): ?array {
+        $country = strtoupper( wp_strip_all_tags( (string) ( $opts['store_return_country'] ?? '' ) ) );
+        if ( $country === '' || strlen( $country ) !== 2 ) {
+            return null;
+        }
+        $days = isset( $opts['store_return_days'] ) ? max( 0, (int) $opts['store_return_days'] ) : 14;
+        $fees = wp_strip_all_tags( (string) ( $opts['store_return_fees'] ?? 'FreeReturn' ) );
+        return [
+            '@type'                => 'MerchantReturnPolicy',
+            '@id'                  => home_url( '/#return-policy' ),
+            'applicableCountry'    => $country,
+            'returnPolicyCountry'  => $country,
+            'returnPolicyCategory' => 'https://schema.org/MerchantReturnFiniteReturnWindow',
+            'merchantReturnDays'   => $days,
+            'returnMethod'         => 'https://schema.org/ReturnByMail',
+            'returnFees'           => 'https://schema.org/' . $fees,
+        ];
+    }
+
+    /**
+     * Build the store-wide OfferShippingDetails. Returns null if no shipping country
+     * configured — Google requires `shippingDestination.addressCountry` for any
+     * shipping-enhanced rich result.
+     */
+    private function build_store_shipping( array $opts ): ?array {
+        $country = strtoupper( wp_strip_all_tags( (string) ( $opts['store_shipping_country'] ?? '' ) ) );
+        if ( $country === '' || strlen( $country ) !== 2 ) {
+            return null;
+        }
+        $currency = wp_strip_all_tags( (string) ( $opts['store_currency'] ?? 'PLN' ) );
+        $rate     = isset( $opts['store_shipping_rate'] ) ? (float) $opts['store_shipping_rate'] : 0.0;
+        $h_min    = isset( $opts['store_handling_min'] ) ? max( 0, (int) $opts['store_handling_min'] ) : 0;
+        $h_max    = isset( $opts['store_handling_max'] ) ? max( $h_min, (int) $opts['store_handling_max'] ) : 1;
+        $t_min    = isset( $opts['store_transit_min'] )  ? max( 0, (int) $opts['store_transit_min'] )  : 1;
+        $t_max    = isset( $opts['store_transit_max'] )  ? max( $t_min, (int) $opts['store_transit_max'] ) : 3;
+        return [
+            '@type'               => 'OfferShippingDetails',
+            '@id'                 => home_url( '/#shipping-policy' ),
+            'shippingRate'        => [
+                '@type'    => 'MonetaryAmount',
+                'value'    => (string) $rate,
+                'currency' => $currency,
+            ],
+            'shippingDestination' => [
+                '@type'          => 'DefinedRegion',
+                'addressCountry' => $country,
+            ],
+            'deliveryTime'        => [
+                '@type'        => 'ShippingDeliveryTime',
+                'handlingTime' => [ '@type' => 'QuantitativeValue', 'minValue' => $h_min, 'maxValue' => $h_max, 'unitCode' => 'DAY' ],
+                'transitTime'  => [ '@type' => 'QuantitativeValue', 'minValue' => $t_min, 'maxValue' => $t_max, 'unitCode' => 'DAY' ],
+            ],
+        ];
     }
 
     private function build_logo( array $opts ): ?array {
@@ -91,12 +173,15 @@ class Ligase_Type_Organization {
             return null;
         }
 
+        // Google requirement (since 2025): logo must be a SQUARE of at least 112x112px,
+        // recommended 600x600+. The old AMP-era 600x60 default produced thin banners
+        // that Google now ignores for Knowledge Graph attribution.
         return [
             '@type'  => 'ImageObject',
             '@id'    => home_url( '/#logo' ),
             'url'    => esc_url( $url ),
-            'width'  => (int) ( $opts['logo_width']  ?? 600 ),
-            'height' => (int) ( $opts['logo_height'] ?? 60 ),
+            'width'  => (int) ( $opts['logo_width']  ?? 112 ),
+            'height' => (int) ( $opts['logo_height'] ?? 112 ),
         ];
     }
 }

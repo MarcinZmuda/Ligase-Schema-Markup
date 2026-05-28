@@ -1,4 +1,18 @@
 <?php
+/**
+ * Ligase - ClaimReview
+ *
+ * NICHE TYPE — verified fact-checkers ONLY. Google deprecated the fact-check
+ * rich result in June 2025; the markup is now only honoured for publishers
+ * approved by Google's Fact Check Tools program. For a regular blog this
+ * emits a valid schema.org graph node but produces no SERP enhancement.
+ *
+ * The opt-in remains so verified fact-checkers can still mark up their work,
+ * but admin UI should clearly state that no rich result will appear for
+ * non-approved publishers.
+ *
+ * @package Ligase
+ */
 
 defined( 'ABSPATH' ) || exit;
 
@@ -45,7 +59,7 @@ class Ligase_Type_ClaimReview {
             'datePublished' => get_the_date( 'c' ),
             'author'        => [ '@id' => home_url( '/#author-' . $author_id ) ],
             'publisher'     => [ '@id' => home_url( '/#org' ) ],
-            'claimReviewed' => esc_html( $claim ),
+            'claimReviewed' => wp_strip_all_tags( $claim ),
             'reviewRating'  => [
                 '@type'          => 'Rating',
                 'ratingValue'    => (string) $this->verdict_to_rating( $verdict ),
@@ -58,7 +72,7 @@ class Ligase_Type_ClaimReview {
         if ( ! empty( $source ) ) {
             $schema['itemReviewed'] = [
                 '@type'       => 'Claim',
-                'author'      => [ '@type' => 'Organization', 'name' => esc_html( $source ) ],
+                'author'      => [ '@type' => 'Organization', 'name' => wp_strip_all_tags( $source ) ],
                 'datePublished' => get_the_date( 'c' ),
             ];
         }

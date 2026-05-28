@@ -33,12 +33,30 @@ class Ligase_Type_SoftwareApplication {
         $schema = [
             '@type'                => 'SoftwareApplication',
             '@id'                  => esc_url( get_permalink() ) . '#software',
-            'name'                 => esc_html( $data['name'] ),
-            'applicationCategory' => $category,
+            'name'                 => wp_strip_all_tags( $data['name'] ),
+            'applicationCategory'  => $category,
+            'publisher'            => [ '@id' => home_url( '/#org' ) ],
         ];
 
+        // Google requires `image` for SoftwareApplication rich results.
+        $image_url = '';
+        if ( ! empty( $data['image'] ) ) {
+            $image_url = $data['image'];
+        } else {
+            $tid = get_post_thumbnail_id( $post_id );
+            if ( $tid ) {
+                $img = wp_get_attachment_image_src( $tid, 'full' );
+                if ( $img ) {
+                    $image_url = $img[0];
+                }
+            }
+        }
+        if ( $image_url ) {
+            $schema['image'] = esc_url( $image_url );
+        }
+
         if ( ! empty( $data['os'] ) ) {
-            $schema['operatingSystem'] = esc_html( $data['os'] );
+            $schema['operatingSystem'] = wp_strip_all_tags( $data['os'] );
         }
 
         if ( ! empty( $data['url'] ) ) {
@@ -50,8 +68,8 @@ class Ligase_Type_SoftwareApplication {
         $currency = $data['currency'] ?? 'USD';
         $schema['offers'] = [
             '@type'         => 'Offer',
-            'price'         => esc_html( $price ),
-            'priceCurrency' => esc_html( $currency ),
+            'price'         => wp_strip_all_tags( $price ),
+            'priceCurrency' => wp_strip_all_tags( $currency ),
         ];
 
         // Rating (if Review is also enabled, link them)

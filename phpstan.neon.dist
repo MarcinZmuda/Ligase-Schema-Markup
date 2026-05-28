@@ -1,0 +1,17 @@
+includes:
+  - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+  level: 5
+  paths:
+    - includes
+    - admin
+  excludePaths:
+    - vendor
+    - tests
+    - node_modules
+  bootstrapFiles:
+    - tests/bootstrap.php
+  ignoreErrors:
+    # WordPress core types are loose; the szepeviktor extension covers most stubs.
+    - identifier: missingType.iterableValue

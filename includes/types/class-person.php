@@ -18,22 +18,25 @@ class Ligase_Type_Person {
         $schema = [
             '@type' => 'Person',
             '@id'   => home_url( '/#author-' . $this->user_id ),
-            'name'  => esc_html( $user->display_name ),
+            'name'  => wp_strip_all_tags( $user->display_name ),
             'url'   => esc_url( get_author_posts_url( $this->user_id ) ),
         ];
 
         if ( $user->description ) {
-            $schema['description'] = esc_html( $user->description );
+            $schema['description'] = wp_strip_all_tags( $user->description );
         }
 
         $job = get_user_meta( $this->user_id, 'ligase_job_title', true );
         if ( $job ) {
-            $schema['jobTitle'] = esc_html( $job );
+            $schema['jobTitle'] = wp_strip_all_tags( $job );
         }
 
         $knows = get_user_meta( $this->user_id, 'ligase_knows_about', true );
         if ( $knows ) {
-            $schema['knowsAbout'] = array_map( 'trim', explode( ',', $knows ) );
+            $schema['knowsAbout'] = array_values( array_filter( array_map(
+                fn( $t ) => wp_strip_all_tags( trim( $t ) ),
+                explode( ',', $knows )
+            ) ) );
         }
 
         $raw_urls = [
@@ -72,14 +75,14 @@ class Ligase_Type_Person {
         // E-E-A-T credential fields
         $honorific = get_user_meta( $this->user_id, 'ligase_honorific', true );
         if ( $honorific ) {
-            $schema['honorificPrefix'] = esc_html( $honorific );
+            $schema['honorificPrefix'] = wp_strip_all_tags( $honorific );
         }
 
         $alumni = get_user_meta( $this->user_id, 'ligase_alumni_of', true );
         if ( $alumni ) {
             $schema['alumniOf'] = [
                 '@type' => 'CollegeOrUniversity',
-                'name'  => esc_html( $alumni ),
+                'name'  => wp_strip_all_tags( $alumni ),
             ];
         }
 
@@ -87,7 +90,7 @@ class Ligase_Type_Person {
         if ( $credential ) {
             $schema['hasCredential'] = [
                 '@type' => 'EducationalOccupationalCredential',
-                'name'  => esc_html( $credential ),
+                'name'  => wp_strip_all_tags( $credential ),
             ];
         }
 

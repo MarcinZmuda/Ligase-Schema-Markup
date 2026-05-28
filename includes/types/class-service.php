@@ -35,27 +35,27 @@ class Ligase_Type_Service {
 		$schema = array(
 			'@type'       => 'Service',
 			'@id'         => esc_url( get_permalink( $post_id ) ) . '#service',
-			'name'        => esc_html( $meta['name'] ?? get_the_title( $post_id ) ),
+			'name'        => wp_strip_all_tags( $meta['name'] ?? get_the_title( $post_id ) ),
 			'url'         => esc_url( get_permalink( $post_id ) ),
 			'provider'    => array( '@id' => home_url( '/#org' ) ),
-			'description' => esc_html( $meta['description'] ?? wp_strip_all_tags( get_the_excerpt( $post_id ) ) ),
+			'description' => wp_strip_all_tags( $meta['description'] ?? wp_strip_all_tags( get_the_excerpt( $post_id ) ) ),
 		);
 
 		// Service type / category
 		if ( ! empty( $meta['service_type'] ) ) {
-			$schema['serviceType'] = esc_html( $meta['service_type'] );
+			$schema['serviceType'] = wp_strip_all_tags( $meta['service_type'] );
 		}
 
 		// Area served
 		if ( ! empty( $meta['area_served'] ) ) {
-			$schema['areaServed'] = esc_html( $meta['area_served'] );
+			$schema['areaServed'] = wp_strip_all_tags( $meta['area_served'] );
 		}
 
 		// Audience
 		if ( ! empty( $meta['audience'] ) ) {
 			$schema['audience'] = array(
 				'@type'       => 'Audience',
-				'audienceType' => esc_html( $meta['audience'] ),
+				'audienceType' => wp_strip_all_tags( $meta['audience'] ),
 			);
 		}
 
@@ -65,8 +65,8 @@ class Ligase_Type_Service {
 		if ( $price ) {
 			$schema['offers'] = array(
 				'@type'         => 'Offer',
-				'price'         => esc_html( $price ),
-				'priceCurrency' => esc_html( $price_currency ),
+				'price'         => wp_strip_all_tags( $price ),
+				'priceCurrency' => wp_strip_all_tags( $price_currency ),
 				'url'           => esc_url( get_permalink( $post_id ) ),
 				'seller'        => array( '@id' => home_url( '/#org' ) ),
 			);

@@ -16,15 +16,48 @@ class Ligase_Entity_Pipeline {
         // Level 2 — always, ~5ms
         $results['structural'] = ( new Ligase_Entity_Extractor_Structure() )->extract( $post_id );
 
-        // Level 3 — only in deep/wikidata mode, ~20ms
+        // Level 3a — local regex NER (fast, ~20ms), in deep/wikidata mode
         if ( in_array( $mode, [ 'deep', 'wikidata' ], true ) && class_exists( 'Ligase_Entity_Extractor_NER' ) ) {
             $results['ner'] = ( new Ligase_Entity_Extractor_NER() )->extract_from_post( $post_id );
+        }
+
+        // Level 3b — async LLM NER results from previous cron runs (higher quality, merged
+        // into the local regex output with LLM taking precedence).
+        $ner_api = get_post_meta( $post_id, '_ligase_ner_api_results', true );
+        if ( is_array( $ner_api ) && ! empty( $ner_api ) ) {
+            $results['ner'] = $this->merge_ner( $results['ner'] ?? [], $ner_api );
         }
 
         // Level 4 — async results from previous Wikidata lookups
         $results['wikidata_suggestions'] = get_post_meta( $post_id, '_ligase_wikidata_suggestions', true ) ?: [];
 
         return $this->map_to_schema_hints( $results, $post_id );
+    }
+
+    /**
+     * Merge local-regex NER results with LLM NER results. LLM entries win on conflict
+     * (higher confidence), but local entries are kept if the LLM didn't surface them.
+     */
+    private function merge_ner( array $local, array $api ): array {
+        $merged = $local;
+        foreach ( [ 'persons', 'organizations', 'products', 'locations' ] as $bucket ) {
+            $by_name = [];
+            foreach ( ( $merged[ $bucket ] ?? [] ) as $entity ) {
+                if ( ! empty( $entity['name'] ) ) {
+                    $by_name[ mb_strtolower( $entity['name'] ) ] = $entity;
+                }
+            }
+            foreach ( ( $api[ $bucket ] ?? [] ) as $entity ) {
+                if ( ! empty( $entity['name'] ) ) {
+                    $entity['source'] = 'llm';
+                    $by_name[ mb_strtolower( $entity['name'] ) ] = $entity;
+                }
+            }
+            if ( ! empty( $by_name ) ) {
+                $merged[ $bucket ] = array_values( $by_name );
+            }
+        }
+        return $merged;
     }
 
     private function map_to_schema_hints( array $entities, int $post_id ): array {
@@ -69,22 +102,42 @@ class Ligase_Entity_Pipeline {
             $hints['_ner_entities'] = $entities['ner'];
         }
 
-        // Wikidata suggestions + auto-apply for single-match entities
+        // Wikidata suggestions + auto-apply
         if ( ! empty( $entities['wikidata_suggestions'] ) ) {
             $hints['_wikidata'] = $entities['wikidata_suggestions'];
 
-            // Auto-apply: if an entity has exactly 1 Wikidata match with high confidence,
-            // add it to sameAs suggestions for automatic linking
+            // Auto-apply criteria (all required) — count === 1 alone is unreliable because
+            // wbsearchentities frequently returns 1 ambiguous match for rare strings, which
+            // produced wrong-entity sameAs links. Now we additionally require:
+            //   - Wikidata label exactly matches the entity name (case-insensitive), OR
+            //   - The entity was confirmed by the LLM NER (`source === 'llm'`)
+            $llm_confirmed = [];
+            foreach ( [ 'persons', 'organizations', 'products', 'locations' ] as $bucket ) {
+                foreach ( ( $entities['ner'][ $bucket ] ?? [] ) as $entity ) {
+                    if ( ( $entity['source'] ?? '' ) === 'llm' && ! empty( $entity['name'] ) ) {
+                        $llm_confirmed[ mb_strtolower( $entity['name'] ) ] = true;
+                    }
+                }
+            }
+
             $auto_sameas = [];
             foreach ( $entities['wikidata_suggestions'] as $name => $matches ) {
-                if ( is_array( $matches ) && count( $matches ) === 1 ) {
-                    $auto_sameas[] = [
-                        'name'   => $name,
-                        'wikidata_id'  => $matches[0]['id'],
-                        'wikidata_url' => $matches[0]['url'],
-                        'label'        => $matches[0]['label'],
-                    ];
+                if ( ! is_array( $matches ) || count( $matches ) !== 1 ) {
+                    continue;
                 }
+                $match            = $matches[0];
+                $label_match      = isset( $match['label'] ) && mb_strtolower( (string) $match['label'] ) === mb_strtolower( (string) $name );
+                $llm_match        = isset( $llm_confirmed[ mb_strtolower( (string) $name ) ] );
+                if ( ! $label_match && ! $llm_match ) {
+                    continue;
+                }
+                $auto_sameas[] = [
+                    'name'         => $name,
+                    'wikidata_id'  => $match['id'],
+                    'wikidata_url' => $match['url'],
+                    'label'        => $match['label'],
+                    'confidence'   => $label_match && $llm_match ? 'high' : 'medium',
+                ];
             }
             if ( ! empty( $auto_sameas ) ) {
                 $hints['_auto_sameas'] = $auto_sameas;

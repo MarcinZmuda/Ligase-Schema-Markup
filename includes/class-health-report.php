@@ -54,6 +54,9 @@ class Ligase_Health_Report {
             'post_status'    => 'publish',
             'posts_per_page' => -1,
             'fields'         => 'ids',
+            'no_found_rows'  => true,
+            'orderby'        => 'ID',
+            'order'          => 'ASC',
         ] );
 
         $issues = [

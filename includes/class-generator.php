@@ -110,9 +110,7 @@ class Ligase_Generator {
         }
 
         // Set up global post context so get_the_ID(), get_the_title() etc. work
-        global $wp_query;
-        $original_post  = $GLOBALS['post'] ?? null;
-        $original_query = $wp_query->post ?? null;
+        $original_post   = $GLOBALS['post'] ?? null;
         $GLOBALS['post'] = $post; // phpcs:ignore WordPress.WP.GlobalVariablesOverride
         setup_postdata( $post );
 
@@ -302,6 +300,10 @@ class Ligase_Generator {
             new Ligase_Type_Course(),
             new Ligase_Type_Event(),
             new Ligase_Type_Service(),
+            new Ligase_Type_Product(),
+            new Ligase_Type_Recipe(),
+            new Ligase_Type_JobPosting(),
+            new Ligase_Type_DiscussionForumPosting(),
         ];
     }
 

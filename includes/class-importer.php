@@ -56,6 +56,37 @@ class Ligase_Importer {
     }
 
     /**
+     * Resolve an image value (which may be a URL, attachment ID, or attachment array)
+     * into a URL. Yoast/Rank Math/AIOSEO all store logos differently across versions:
+     *   - Yoast v13-: string URL
+     *   - Yoast v14+: attachment ID (numeric string)
+     *   - Rank Math v1.0.49-: string URL
+     *   - Rank Math v1.0.50+: array [ 'id' => N, 'url' => '...' ]
+     *   - AIOSEO: usually URL string but sometimes attachment ID
+     */
+    private function resolve_image_url( $value ): string {
+        if ( empty( $value ) ) {
+            return '';
+        }
+        if ( is_array( $value ) ) {
+            if ( ! empty( $value['url'] ) ) {
+                return (string) $value['url'];
+            }
+            $id_candidate = $value['id'] ?? $value['ID'] ?? null;
+            if ( $id_candidate && is_numeric( $id_candidate ) ) {
+                $url = wp_get_attachment_image_url( (int) $id_candidate, 'full' );
+                return $url ?: '';
+            }
+            return '';
+        }
+        if ( is_numeric( $value ) ) {
+            $url = wp_get_attachment_image_url( (int) $value, 'full' );
+            return $url ?: '';
+        }
+        return (string) $value;
+    }
+
+    /**
      * Run import from a given source.
      *
      * @param string $source Source key (yoast, rankmath, aioseo).
@@ -85,11 +116,14 @@ class Ligase_Importer {
             $imported++;
         } else { $skipped++; }
 
-        // Logo
+        // Logo — Yoast v14+ stores attachment ID, not URL.
         if ( ! empty( $titles['company_logo'] ) && empty( $opts['org_logo'] ) ) {
-            $opts['org_logo'] = esc_url_raw( $titles['company_logo'] );
-            $details[] = 'Logo organizacji zaimportowane.';
-            $imported++;
+            $logo_url = $this->resolve_image_url( $titles['company_logo'] );
+            if ( $logo_url ) {
+                $opts['org_logo'] = esc_url_raw( $logo_url );
+                $details[] = 'Logo organizacji zaimportowane.';
+                $imported++;
+            } else { $skipped++; }
         } else { $skipped++; }
 
         // Social links -> sameAs
@@ -151,11 +185,14 @@ class Ligase_Importer {
             $imported++;
         } else { $skipped++; }
 
-        // Logo
+        // Logo — Rank Math v1.0.50+ stores [ 'id' => N, 'url' => '...' ] array.
         if ( ! empty( $titles['knowledgegraph_logo'] ) && empty( $opts['org_logo'] ) ) {
-            $opts['org_logo'] = esc_url_raw( $titles['knowledgegraph_logo'] );
-            $details[] = 'Logo organizacji zaimportowane.';
-            $imported++;
+            $logo_url = $this->resolve_image_url( $titles['knowledgegraph_logo'] );
+            if ( $logo_url ) {
+                $opts['org_logo'] = esc_url_raw( $logo_url );
+                $details[] = 'Logo organizacji zaimportowane.';
+                $imported++;
+            } else { $skipped++; }
         } else { $skipped++; }
 
         // Phone
@@ -191,8 +228,20 @@ class Ligase_Importer {
     }
 
     private function import_aioseo(): array {
-        $raw     = get_option( 'aioseo_options', '' );
-        $aioseo  = is_string( $raw ) ? json_decode( $raw, true ) : ( is_array( $raw ) ? $raw : [] );
+        $raw    = get_option( 'aioseo_options', '' );
+        // AIOSEO v3.x stores serialized PHP arrays; v4.x stores JSON. maybe_unserialize handles
+        // both transparently (returns the array unchanged if it's not serialized).
+        if ( is_string( $raw ) ) {
+            $maybe_serialized = maybe_unserialize( $raw );
+            if ( is_array( $maybe_serialized ) ) {
+                $aioseo = $maybe_serialized;
+            } else {
+                $decoded = json_decode( $raw, true );
+                $aioseo  = is_array( $decoded ) ? $decoded : [];
+            }
+        } else {
+            $aioseo = is_array( $raw ) ? $raw : [];
+        }
         $opts    = get_option( 'ligase_options', [] );
         $details = [];
         $imported = 0;
@@ -210,16 +259,21 @@ class Ligase_Importer {
             $imported++;
         } else { $skipped++; }
 
-        // Logo
-        $logo = $aioseo['searchAppearance']['global']['schema']['organizationLogo'] ?? '';
-        if ( $logo && empty( $opts['org_logo'] ) ) {
-            $opts['org_logo'] = esc_url_raw( $logo );
-            $details[] = 'Logo zaimportowane.';
-            $imported++;
+        // Logo — AIOSEO v4 may store URL or attachment ID. Fall back to schemaLogo path in v3.
+        $logo = $aioseo['searchAppearance']['global']['schema']['organizationLogo']
+            ?? ( $aioseo['schema']['organizationLogo'] ?? '' );
+        if ( ! empty( $logo ) && empty( $opts['org_logo'] ) ) {
+            $logo_url = $this->resolve_image_url( $logo );
+            if ( $logo_url ) {
+                $opts['org_logo'] = esc_url_raw( $logo_url );
+                $details[] = 'Logo zaimportowane.';
+                $imported++;
+            } else { $skipped++; }
         } else { $skipped++; }
 
-        // Social
+        // Social — AIOSEO v4.5+ moved profiles under social.profiles.urls.{platform}Url
         $social = $aioseo['social'] ?? [];
+        $profiles_v45 = $social['profiles']['urls'] ?? null;
         $social_map = [
             'facebookUrl'  => 'social_facebook',
             'twitterUrl'   => 'social_twitter',
@@ -229,8 +283,14 @@ class Ligase_Importer {
         ];
 
         foreach ( $social_map as $aio_key => $ligase_key ) {
-            $profiles = $social['profiles'] ?? $social;
-            $value    = $profiles[ $aio_key ] ?? '';
+            $value = '';
+            if ( is_array( $profiles_v45 ) ) {
+                $value = $profiles_v45[ $aio_key ] ?? '';
+            }
+            if ( ! $value ) {
+                $profiles_legacy = $social['profiles'] ?? $social;
+                $value           = is_array( $profiles_legacy ) ? ( $profiles_legacy[ $aio_key ] ?? '' ) : '';
+            }
             if ( ! empty( $value ) && empty( $opts[ $ligase_key ] ) ) {
                 $opts[ $ligase_key ] = esc_url_raw( $value );
                 $details[] = ucfirst( str_replace( 'social_', '', $ligase_key ) ) . ': ' . $opts[ $ligase_key ];

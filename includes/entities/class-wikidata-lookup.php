@@ -4,20 +4,44 @@ defined( 'ABSPATH' ) || exit;
 
 class Ligase_Wikidata_Lookup {
 
-    const API_URL   = 'https://www.wikidata.org/w/api.php';
-    const CACHE_KEY = 'ligase_wiki_';
-    const TTL       = WEEK_IN_SECONDS * 4;
+    const API_URL          = 'https://www.wikidata.org/w/api.php';
+    const CACHE_KEY        = 'ligase_wiki_';
+    const TTL              = WEEK_IN_SECONDS * 4;
+    const NEGATIVE_TTL     = HOUR_IN_SECONDS * 6; // negative cache 6h, not 4 weeks
+    const USER_AGENT       = 'Ligase/2.0 (WordPress plugin; https://marcinzmuda.com/ligase; entity linking for schema.org)';
 
-    public function search( string $name, string $language = 'pl' ): ?array {
+    /**
+     * Search Wikidata for an entity by name. Tries the site locale's language first,
+     * then falls back to English so names like "Cloudflare" / "Stripe" that exist only
+     * in en-Wikidata are still resolved on Polish sites.
+     */
+    public function search( string $name, ?string $language = null ): ?array {
         $name = mb_substr( trim( $name ), 0, 200 );
         if ( empty( $name ) ) {
             return null;
         }
 
-        $cache_key = self::CACHE_KEY . md5( $name . $language );
+        if ( null === $language ) {
+            $language = strtolower( substr( str_replace( '_', '-', get_locale() ), 0, 2 ) ) ?: 'en';
+        }
+
+        // Build the language fallback chain once.
+        $languages = array_values( array_unique( [ $language, 'en' ] ) );
+
+        foreach ( $languages as $lang ) {
+            $hits = $this->search_single_language( $name, $lang );
+            if ( ! empty( $hits ) ) {
+                return $hits;
+            }
+        }
+        return [];
+    }
+
+    private function search_single_language( string $name, string $language ): ?array {
+        $cache_key = self::CACHE_KEY . md5( $name . '|' . $language );
         $cached    = get_transient( $cache_key );
         if ( $cached !== false ) {
-            return $cached;
+            return is_array( $cached ) ? $cached : null;
         }
 
         $response = wp_remote_get( add_query_arg( [
@@ -29,18 +53,20 @@ class Ligase_Wikidata_Lookup {
             'type'     => 'item',
         ], self::API_URL ), [
             'timeout' => 3,
-            'headers' => [ 'User-Agent' => 'Ligase-WordPress-Plugin/1.0 (schema markup)' ],
+            'headers' => [ 'User-Agent' => self::USER_AGENT ],
         ] );
 
         if ( is_wp_error( $response ) ) {
             if ( class_exists( 'Ligase_Logger' ) ) {
                 Ligase_Logger::error( 'Wikidata API error', [
                     'name'  => $name,
+                    'lang'  => $language,
                     'error' => $response->get_error_message(),
                 ] );
             }
-            // Cache the failure to avoid repeated failed requests
-            set_transient( $cache_key, [], 300 ); // 5 min negative cache
+            // Negative cache is intentionally SHORT (6h, not 4 weeks) so transient errors
+            // don't lock out a name for a month. Recoverable failures should re-try soon.
+            set_transient( $cache_key, [], 300 );
             return null;
         }
 
@@ -50,6 +76,7 @@ class Ligase_Wikidata_Lookup {
             if ( class_exists( 'Ligase_Logger' ) ) {
                 Ligase_Logger::error( 'Wikidata API JSON decode error', [
                     'name'  => $name,
+                    'lang'  => $language,
                     'error' => json_last_error_msg(),
                 ] );
             }
@@ -58,13 +85,13 @@ class Ligase_Wikidata_Lookup {
         $results = array_slice( $body['search'] ?? [], 0, 3 );
 
         if ( empty( $results ) ) {
-            set_transient( $cache_key, [], self::TTL );
+            set_transient( $cache_key, [], self::NEGATIVE_TTL );
             return [];
         }
 
         $mapped = array_map( fn( $r ) => [
             'id'          => $r['id'],
-            'label'       => $r['label'],
+            'label'       => $r['label'] ?? '',
             'description' => $r['description'] ?? '',
             'url'         => "https://www.wikidata.org/wiki/{$r['id']}",
         ], $results );

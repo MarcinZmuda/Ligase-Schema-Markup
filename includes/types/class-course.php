@@ -24,14 +24,14 @@ class Ligase_Type_Course {
         $schema = [
             '@type'       => 'Course',
             '@id'         => esc_url( get_permalink() ) . '#course',
-            'name'        => esc_html( $data['name'] ),
+            'name'        => wp_strip_all_tags( $data['name'] ),
             'url'         => esc_url( get_permalink() ),
             'inLanguage'  => str_replace( '_', '-', get_locale() ),
             'provider'    => [ '@id' => home_url( '/#org' ) ],
         ];
 
         if ( ! empty( $data['description'] ) ) {
-            $schema['description'] = esc_html( mb_substr( $data['description'], 0, 300 ) );
+            $schema['description'] = wp_strip_all_tags( mb_substr( $data['description'], 0, 300 ) );
         } else {
             $excerpt = wp_strip_all_tags( get_the_excerpt() );
             if ( $excerpt ) {
@@ -53,11 +53,11 @@ class Ligase_Type_Course {
         }
 
         if ( ! empty( $data['start_date'] ) ) {
-            $instance['startDate'] = esc_html( $data['start_date'] );
+            $instance['startDate'] = wp_strip_all_tags( $data['start_date'] );
         }
 
         if ( ! empty( $data['end_date'] ) ) {
-            $instance['endDate'] = esc_html( $data['end_date'] );
+            $instance['endDate'] = wp_strip_all_tags( $data['end_date'] );
         }
 
         if ( ! empty( $instance ) ) {
@@ -69,8 +69,8 @@ class Ligase_Type_Course {
         if ( isset( $data['price'] ) ) {
             $schema['offers'] = [
                 '@type'         => 'Offer',
-                'price'         => esc_html( $data['price'] ),
-                'priceCurrency' => esc_html( $data['currency'] ?? 'PLN' ),
+                'price'         => wp_strip_all_tags( $data['price'] ),
+                'priceCurrency' => wp_strip_all_tags( $data['currency'] ?? 'PLN' ),
                 'availability'  => 'https://schema.org/InStock',
             ];
         }

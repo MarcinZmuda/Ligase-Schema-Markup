@@ -150,7 +150,7 @@ class Ligase_Type_LocalBusiness {
 		$schema = array(
 			'@type' => $type,
 			'@id'   => home_url( '/#localbusiness' ),
-			'name'  => esc_html( $name ),
+			'name'  => wp_strip_all_tags( $name ),
 			'url'   => esc_url( home_url( '/' ) ),
 		);
 
@@ -159,7 +159,7 @@ class Ligase_Type_LocalBusiness {
 			? $opts['lb_description']
 			: ( $opts['org_description'] ?? '' );
 		if ( $desc ) {
-			$schema['description'] = esc_html( $desc );
+			$schema['description'] = wp_strip_all_tags( $desc );
 		}
 
 		// ── Logo / Image ──────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ class Ligase_Type_LocalBusiness {
 		$phone = ! empty( $opts['org_phone'] ) ? $opts['org_phone'] : '';
 		$email = ! empty( $opts['org_email'] ) ? $opts['org_email'] : '';
 		if ( $phone ) {
-			$schema['telephone'] = esc_html( $phone );
+			$schema['telephone'] = wp_strip_all_tags( $phone );
 		}
 		if ( $email ) {
 			$schema['email'] = sanitize_email( $email );
@@ -207,12 +207,12 @@ class Ligase_Type_LocalBusiness {
 
 		// ── Price range ───────────────────────────────────────────────────────
 		if ( ! empty( $opts['lb_price_range'] ) ) {
-			$schema['priceRange'] = esc_html( $opts['lb_price_range'] );
+			$schema['priceRange'] = wp_strip_all_tags( $opts['lb_price_range'] );
 		}
 
 		// ── Area served (for service-area businesses) ─────────────────────────
 		if ( ! empty( $opts['lb_area_served'] ) ) {
-			$schema['areaServed'] = esc_html( $opts['lb_area_served'] );
+			$schema['areaServed'] = wp_strip_all_tags( $opts['lb_area_served'] );
 		}
 
 		// ── sameAs — reuse social links from Organization settings ────────────
@@ -270,7 +270,7 @@ class Ligase_Type_LocalBusiness {
 		);
 		foreach ( $map as $opt_key => $schema_key ) {
 			if ( ! empty( $opts[ $opt_key ] ) ) {
-				$address[ $schema_key ] = esc_html( $opts[ $opt_key ] );
+				$address[ $schema_key ] = wp_strip_all_tags( $opts[ $opt_key ] );
 			}
 		}
 		return $address;

@@ -2,6 +2,25 @@
     'use strict';
 
     // =========================================================================
+    // i18n helper — delegates to wp.i18n.__ when available, falls back to identity.
+    // Source strings are currently Polish (legacy); the wp.i18n integration is wired
+    // so future English-source migration produces working translations without touching
+    // call sites. Compile translations with: `wp i18n make-json languages/`.
+    // =========================================================================
+
+    var __ = (window.wp && window.wp.i18n && window.wp.i18n.__)
+        ? function(text) { return window.wp.i18n.__(text, 'ligase'); }
+        : function(text) { return text; };
+
+    var sprintf = (window.wp && window.wp.i18n && window.wp.i18n.sprintf)
+        ? window.wp.i18n.sprintf
+        : function(fmt) {
+            var args = Array.prototype.slice.call(arguments, 1);
+            var i = 0;
+            return fmt.replace(/%[sd]/g, function() { return args[i++]; });
+        };
+
+    // =========================================================================
     // API Layer
     // =========================================================================
 
@@ -74,7 +93,7 @@
 
         LigaseAPI.getDashboardStats(function(err, data) {
             if (err || !data) {
-                $loading.text('Nie udalo sie zaladowac statystyk.');
+                $loading.text(__('Nie udało się załadować statystyk.'));
                 return;
             }
             $loading.hide();
@@ -95,13 +114,13 @@
         $('#ligase-gsc-connect').on('click', function() {
             var json = $('#ligase-gsc-json').val().trim();
             var siteUrl = $('#ligase-gsc-site-url').val().trim();
-            if (!json) { alert('Wklej Service Account JSON.'); return; }
+            if (!json) { alert(__('Wklej Service Account JSON.')); return; }
 
-            var $btn = $(this).prop('disabled', true).text('Laczenie...');
+            var $btn = $(this).prop('disabled', true).text(__('Łączenie...'));
             LigaseAPI.gscSaveCredentials(json, siteUrl, function(err, data) {
-                $btn.prop('disabled', false).text('Polacz');
+                $btn.prop('disabled', false).text(__('Połącz'));
                 if (err) {
-                    alert('Blad: ' + err);
+                    alert(sprintf(__('Błąd: %s'), err));
                 } else {
                     location.reload();
                 }
@@ -110,11 +129,11 @@
 
         // GSC Sync
         $('#ligase-gsc-sync').on('click', function() {
-            var $btn = $(this).prop('disabled', true).text('Synchronizacja...');
+            var $btn = $(this).prop('disabled', true).text(__('Synchronizacja...'));
             LigaseAPI.gscSync(function(err, data) {
-                $btn.prop('disabled', false).text('Synchronizuj dane');
-                if (err) { alert('Blad: ' + err); }
-                else { alert(data.message || 'Gotowe.'); }
+                $btn.prop('disabled', false).text(__('Synchronizuj dane'));
+                if (err) { alert(sprintf(__('Błąd: %s'), err)); }
+                else { alert(data.message || __('Gotowe.')); }
             });
         });
 

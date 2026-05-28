@@ -70,9 +70,14 @@ class Ligase_Ajax {
 	 *
 	 * Sends a JSON error and terminates if verification fails.
 	 *
+	 * @param string $cap  Capability required for this endpoint. Defaults to manage_options
+	 *                     (the conservative choice for global / settings endpoints).
+	 *                     Endpoints that run in the editor context (single-post scan,
+	 *                     validate, preview) should pass 'edit_posts' and then additionally
+	 *                     check current_user_can( 'edit_post', $post_id ) per-post.
 	 * @return void
 	 */
-	private function verify_request(): void {
+	private function verify_request( string $cap = 'manage_options' ): void {
 		if ( ! check_ajax_referer( 'ligase_admin', 'nonce', false ) ) {
 			wp_send_json_error(
 				array( 'message' => __( 'Invalid security token.', 'ligase' ) ),
@@ -80,9 +85,22 @@ class Ligase_Ajax {
 			);
 		}
 
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( $cap ) ) {
 			wp_send_json_error(
 				array( 'message' => __( 'Insufficient permissions.', 'ligase' ) ),
+				403
+			);
+		}
+	}
+
+	/**
+	 * Ensure the current user can edit a specific post. Used by per-post endpoints
+	 * (scan / validate / preview) after the editor-level capability check passes.
+	 */
+	private function verify_post_access( int $post_id ): void {
+		if ( ! $post_id || ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Invalid post or insufficient permissions for this post.', 'ligase' ) ),
 				403
 			);
 		}
@@ -156,11 +174,12 @@ class Ligase_Ajax {
 	 * Scans a single post for entity hints and schema suggestions.
 	 */
 	public function handle_ligase_scan_post(): void {
-		$this->verify_request();
+		$this->verify_request( 'edit_posts' );
 
 		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$this->verify_post_access( $post_id );
 
-		if ( ! $post_id || ! get_post( $post_id ) ) {
+		if ( ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid post ID.', 'ligase' ) ) );
 		}
 
@@ -263,6 +282,9 @@ class Ligase_Ajax {
 				'post_status'    => 'publish',
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
+				'no_found_rows'  => true,
+				'orderby'        => 'ID',
+				'order'          => 'ASC',
 			) );
 
 			$post_ids_to_fix = array();
@@ -308,11 +330,12 @@ class Ligase_Ajax {
 	 * Previews JSON-LD output for a given post without rendering it.
 	 */
 	public function handle_ligase_preview_json(): void {
-		$this->verify_request();
+		$this->verify_request( 'edit_posts' );
 
 		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$this->verify_post_access( $post_id );
 
-		if ( ! $post_id || ! get_post( $post_id ) ) {
+		if ( ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid post ID.', 'ligase' ) ) );
 		}
 
@@ -322,7 +345,7 @@ class Ligase_Ajax {
 			$generator = new Ligase_Generator();
 			$schema    = $generator->get_graph_for_post( $post_id );
 
-			$json = wp_json_encode( $schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+			$json = wp_json_encode( $schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
 
 			if ( json_last_error() !== JSON_ERROR_NONE ) {
 				Ligase_Logger::error( 'JSON encoding error', array( 'error' => json_last_error_msg() ) );
@@ -348,20 +371,21 @@ class Ligase_Ajax {
 		$post_ids = isset( $_POST['post_ids'] ) && is_array( $_POST['post_ids'] )
 			? array_map( 'absint', $_POST['post_ids'] )
 			: array();
-		$mode     = isset( $_POST['mode'] ) ? sanitize_text_field( wp_unslash( $_POST['mode'] ) ) : 'replace';
+		$mode      = isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : 'replace';
+		$threshold = isset( $_POST['threshold'] ) ? max( 0, min( 100, absint( $_POST['threshold'] ) ) ) : 50;
 
 		if ( empty( $post_ids ) ) {
 			wp_send_json_error( array( 'message' => __( 'No post IDs provided.', 'ligase' ) ) );
 		}
 
-		if ( ! in_array( $mode, array( 'replace', 'supplement' ), true ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid mode. Use "replace" or "supplement".', 'ligase' ) ) );
+		if ( ! in_array( $mode, array( 'replace', 'supplement', 'restore' ), true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid mode. Use "replace", "supplement" or "restore".', 'ligase' ) ) );
 		}
 
-		Ligase_Logger::info( sprintf( 'Applying audit replacements to %d posts (mode: %s).', count( $post_ids ), $mode ) );
+		Ligase_Logger::info( sprintf( 'Applying audit action to %d posts (mode: %s, threshold: %d).', count( $post_ids ), $mode, $threshold ) );
 
 		try {
-			$auditor = new Ligase_Auditor();
+			$auditor = new Ligase_Auditor( $threshold, $mode );
 			$results = array();
 
 			foreach ( $post_ids as $post_id ) {
@@ -374,22 +398,40 @@ class Ligase_Ajax {
 					continue;
 				}
 
-				$outcome = $auditor->apply_replacement( $post_id );
+				switch ( $mode ) {
+					case 'restore':
+						$outcome = $auditor->restore_replacement( $post_id );
+						$msg     = $outcome
+							? __( 'Replacement reverted.', 'ligase' )
+							: __( 'No active replacement to revert.', 'ligase' );
+						break;
+					case 'supplement':
+						$outcome = $auditor->apply_supplement( $post_id );
+						$msg     = $outcome
+							? __( 'Supplement applied (additive).', 'ligase' )
+							: __( 'No changes applied.', 'ligase' );
+						break;
+					case 'replace':
+					default:
+						$outcome = $auditor->apply_replacement( $post_id );
+						$msg     = $outcome
+							? __( 'Replacement applied.', 'ligase' )
+							: __( 'No changes applied.', 'ligase' );
+						break;
+				}
 
 				$results[] = array(
 					'post_id' => $post_id,
 					'success' => (bool) $outcome,
-					'message' => $outcome
-						? __( 'Replacement applied.', 'ligase' )
-						: __( 'No changes applied.', 'ligase' ),
+					'message' => $msg,
 				);
 			}
 
-			Ligase_Logger::info( sprintf( 'Audit replacements finished for %d posts.', count( $results ) ) );
+			Ligase_Logger::info( sprintf( 'Audit action finished for %d posts (mode: %s).', count( $results ), $mode ) );
 
 			wp_send_json_success( array( 'results' => $results ) );
 		} catch ( \Exception $e ) {
-			Ligase_Logger::error( 'Audit replacements failed: ' . $e->getMessage() );
+			Ligase_Logger::error( 'Audit action failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
 		}
 	}
@@ -759,7 +801,7 @@ class Ligase_Ajax {
 							update_post_meta(
 								$post_id,
 								'_ligase_schema',
-								wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE )
+								wp_json_encode( $schema, JSON_UNESCAPED_UNICODE )
 							);
 							++$fixed;
 						}
@@ -840,10 +882,11 @@ class Ligase_Ajax {
 	// =====================================================================
 
 	public function handle_ligase_validate_post(): void {
-		$this->verify_request();
+		$this->verify_request( 'edit_posts' );
 
 		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
-		if ( ! $post_id || ! get_post( $post_id ) ) {
+		$this->verify_post_access( $post_id );
+		if ( ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => 'Invalid post ID.' ) );
 		}
 

@@ -28,8 +28,8 @@ class Ligase_Type_DefinedTerm {
             }
             $defined_terms[] = [
                 '@type'       => 'DefinedTerm',
-                'name'        => esc_html( $term['name'] ),
-                'description' => esc_html( $term['description'] ),
+                'name'        => wp_strip_all_tags( $term['name'] ),
+                'description' => wp_strip_all_tags( $term['description'] ),
                 'inDefinedTermSet' => esc_url( get_permalink() ) . '#glossary',
             ];
         }
@@ -41,7 +41,7 @@ class Ligase_Type_DefinedTerm {
         return [
             '@type'      => 'DefinedTermSet',
             '@id'        => esc_url( get_permalink() ) . '#glossary',
-            'name'       => esc_html( get_the_title() ),
+            'name'       => wp_strip_all_tags( get_the_title() ),
             'url'        => esc_url( get_permalink() ),
             'inLanguage' => str_replace( '_', '-', get_locale() ),
             'hasDefinedTerm' => $defined_terms,

@@ -28,8 +28,8 @@ class Ligase_Type_HowTo {
             $steps[] = [
                 '@type'    => 'HowToStep',
                 'position' => $i + 1,
-                'name'     => esc_html( $step['name'] ),
-                'text'     => esc_html( $step['text'] ),
+                'name'     => wp_strip_all_tags( $step['name'] ),
+                'text'     => wp_strip_all_tags( $step['text'] ),
                 'url'      => esc_url( get_permalink() ) . '#krok-' . ( $i + 1 ),
             ];
         }
@@ -39,14 +39,34 @@ class Ligase_Type_HowTo {
         }
 
         $schema = [
-            '@type' => 'HowTo',
-            '@id'   => esc_url( get_permalink() ) . '#howto',
-            'name'  => esc_html( $howto_data['name'] ?? get_the_title() ),
-            'step'  => $steps,
+            '@type'      => 'HowTo',
+            '@id'        => esc_url( get_permalink() ) . '#howto',
+            'name'       => wp_strip_all_tags( $howto_data['name'] ?? get_the_title() ),
+            'inLanguage' => str_replace( '_', '-', get_locale() ),
+            'step'       => $steps,
         ];
 
+        // Google requires `image` for HowTo rich results. Use explicit howto image, then
+        // post thumbnail, then organization logo as last-ditch fallback. Without ANY image
+        // Google silently drops the rich result.
+        $image_url = '';
+        if ( ! empty( $howto_data['image'] ) ) {
+            $image_url = $howto_data['image'];
+        } else {
+            $tid = get_post_thumbnail_id( $post_id );
+            if ( $tid ) {
+                $img = wp_get_attachment_image_src( $tid, 'full' );
+                if ( $img ) {
+                    $image_url = $img[0];
+                }
+            }
+        }
+        if ( $image_url ) {
+            $schema['image'] = esc_url( $image_url );
+        }
+
         if ( ! empty( $howto_data['totalTime'] ) && $this->is_iso8601_duration( $howto_data['totalTime'] ) ) {
-            $schema['totalTime'] = esc_html( $howto_data['totalTime'] );
+            $schema['totalTime'] = wp_strip_all_tags( $howto_data['totalTime'] );
         }
 
         return $schema;

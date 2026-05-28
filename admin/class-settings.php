@@ -403,7 +403,7 @@ class Ligase_Settings {
 			'org_phone'           => '+48123456789',
 			'knows_about'         => __( 'np. SEO, content marketing, WordPress', 'ligase' ),
 			'logo_width'          => '600',
-			'logo_height'         => '60',
+			'logo_height'         => '600',
 			'lb_name'             => __( 'Zostaw puste aby użyć nazwy organizacji', 'ligase' ),
 			'lb_description'      => __( 'np. Restauracja serwująca kuchnię śródziemnomorską w centrum Warszawy.', 'ligase' ),
 			'lb_street'           => __( 'np. ul. Marszałkowska 10', 'ligase' ),
@@ -430,8 +430,8 @@ class Ligase_Settings {
 			'org_email'       => __( 'Publiczny adres e-mail organizacji. Wpisz tylko jeśli jest widoczny na stronie kontaktowej.', 'ligase' ),
 			'org_phone'       => __( 'Format E.164 zalecany przez schema.org: +48123456789 (kraj + numer bez spacji). Wymagane dla LocalBusiness rich results.', 'ligase' ),
 			'knows_about'     => __( 'Tematy które organizacja zna i o których pisze. Oddzielone przecinkami. Wpływają na topical authority w Knowledge Graph.', 'ligase' ),
-			'logo_width'      => __( 'Szerokość logo w px. Sprawdź w przeglądarce: kliknij logo prawym → "Inspect". Google wymaga min. 112 px.', 'ligase' ),
-			'logo_height'     => __( 'Wysokość logo w px. Dla logo 600×60 wpisz 600 i 60.', 'ligase' ),
+			'logo_width'      => __( 'Szerokość logo w px. Google od 2025 wymaga KWADRATU min. 112×112 (zalecane 600×600+). Stary banner 600×60 (AMP) już nie wystarcza.', 'ligase' ),
+			'logo_height'     => __( 'Wysokość logo w px. Wartość powinna być równa szerokości — logo musi być kwadratem (min. 112×112, zalecane 600×600+).', 'ligase' ),
 			// Social
 			'social_wikidata'  => __( 'URL do strony Wikidata (np. https://www.wikidata.org/wiki/Q12345). Najsilniejszy sygnał tożsamości encji — łączy Twoją firmę z Knowledge Graph. Szukaj nazwy firmy na wikidata.org.', 'ligase' ),
 			'social_wikipedia' => __( 'URL artykułu Wikipedia o Twojej firmie lub autorze. Opcjonalne, ale bardzo silny sygnał E-E-A-T.', 'ligase' ),
@@ -514,7 +514,10 @@ class Ligase_Settings {
 	// =========================================================================
 
 	public static function sanitize( $input ) {
-		$clean = self::defaults();
+		// Merge into the CURRENT saved options (not defaults) so partial sub-form submits
+		// don't wipe unrelated sections. Defaults only fill keys that have never been set.
+		$current = get_option( self::KEY, array() );
+		$clean   = array_merge( self::defaults(), is_array( $current ) ? $current : array() );
 
 		if ( ! is_array( $input ) ) {
 			return $clean;

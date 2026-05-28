@@ -24,18 +24,18 @@ class Ligase_Type_Event {
         $schema = [
             '@type'     => 'Event',
             '@id'       => esc_url( get_permalink() ) . '#event',
-            'name'      => esc_html( $data['name'] ),
-            'startDate' => esc_html( $data['start_date'] ),
+            'name'      => wp_strip_all_tags( $data['name'] ),
+            'startDate' => wp_strip_all_tags( $data['start_date'] ),
             'organizer' => [ '@id' => home_url( '/#org' ) ],
             'url'       => esc_url( get_permalink() ),
         ];
 
         if ( ! empty( $data['end_date'] ) ) {
-            $schema['endDate'] = esc_html( $data['end_date'] );
+            $schema['endDate'] = wp_strip_all_tags( $data['end_date'] );
         }
 
         if ( ! empty( $data['description'] ) ) {
-            $schema['description'] = esc_html( mb_substr( $data['description'], 0, 300 ) );
+            $schema['description'] = wp_strip_all_tags( mb_substr( $data['description'], 0, 300 ) );
         }
 
         // Location — online or physical
@@ -47,20 +47,24 @@ class Ligase_Type_Event {
                 'url'   => esc_url( $data['online_url'] ?? get_permalink() ),
             ];
         } else {
-            $schema['eventAttendanceMode'] = 'https://schema.org/OfflineEventAttendanceMode';
-            if ( ! empty( $data['venue_name'] ) ) {
-                $location = [
-                    '@type' => 'Place',
-                    'name'  => esc_html( $data['venue_name'] ),
-                ];
-                if ( ! empty( $data['venue_address'] ) ) {
-                    $location['address'] = [
-                        '@type'          => 'PostalAddress',
-                        'streetAddress'  => esc_html( $data['venue_address'] ),
-                    ];
-                }
-                $schema['location'] = $location;
+            // Google requires `location` whenever attendanceMode is Offline. If venue_name
+            // is missing, return null rather than emitting an invalid Event (which would
+            // produce a Search Console warning + lose the rich result).
+            if ( empty( $data['venue_name'] ) ) {
+                return null;
             }
+            $schema['eventAttendanceMode'] = 'https://schema.org/OfflineEventAttendanceMode';
+            $location = [
+                '@type' => 'Place',
+                'name'  => wp_strip_all_tags( $data['venue_name'] ),
+            ];
+            if ( ! empty( $data['venue_address'] ) ) {
+                $location['address'] = [
+                    '@type'          => 'PostalAddress',
+                    'streetAddress'  => wp_strip_all_tags( $data['venue_address'] ),
+                ];
+            }
+            $schema['location'] = $location;
         }
 
         // Status
@@ -78,8 +82,8 @@ class Ligase_Type_Event {
             $schema['offers'] = [
                 '@type'         => 'Offer',
                 'url'           => esc_url( $data['ticket_url'] ),
-                'price'         => esc_html( $data['price'] ?? '0' ),
-                'priceCurrency' => esc_html( $data['currency'] ?? 'PLN' ),
+                'price'         => wp_strip_all_tags( $data['price'] ?? '0' ),
+                'priceCurrency' => wp_strip_all_tags( $data['currency'] ?? 'PLN' ),
                 'availability'  => 'https://schema.org/InStock',
             ];
         }

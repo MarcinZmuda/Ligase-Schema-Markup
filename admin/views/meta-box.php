@@ -58,6 +58,22 @@ $toggles = array(
 		'label' => __( 'Service (usluga)', 'ligase' ),
 		'hint'  => __( 'Dla stron usług. Podlacza usluge do Organization entity.', 'ligase' ),
 	),
+	'_ligase_enable_product'     => array(
+		'label' => __( 'Product (Merchant listing)', 'ligase' ),
+		'hint'  => __( 'WooCommerce wykrywane automatycznie. Aktywny rich result + Popular Products w Google Shopping.', 'ligase' ),
+	),
+	'_ligase_enable_recipe'      => array(
+		'label' => __( 'Recipe (przepis kulinarny)', 'ligase' ),
+		'hint'  => __( 'Aktywny rich result — jeden z 4 typów host carousel. Wymaga name + image + recipeIngredient + recipeInstructions.', 'ligase' ),
+	),
+	'_ligase_enable_jobposting'  => array(
+		'label' => __( 'JobPosting (oferta pracy / Google Jobs)', 'ligase' ),
+		'hint'  => __( 'Osobne search experience w Google Jobs. CPT job_listing wykrywany automatycznie. validThrough wymagane.', 'ligase' ),
+	),
+	'_ligase_enable_forum'       => array(
+		'label' => __( 'DiscussionForumPosting (forum/wątek)', 'ligase' ),
+		'hint'  => __( 'Discussions & Forums SERP od XI 2023. bbPress topics wykrywane automatycznie.', 'ligase' ),
+	),
 );
 
 $allowed_types = array(
@@ -102,6 +118,154 @@ $allowed_types = array(
 			</label>
 		<?php endforeach; ?>
 	</fieldset>
+
+	<?php
+	// =====================================================================
+	// ADVANCED FIELDS — paywall / dateline / image license / citations
+	// =====================================================================
+	$paywalled            = get_post_meta( $post->ID, '_ligase_paywalled', true ) === '1';
+	$paywall_selector     = (string) get_post_meta( $post->ID, '_ligase_paywall_selector', true );
+	$force_modified       = get_post_meta( $post->ID, '_ligase_force_date_modified', true ) === '1';
+	$dateline             = (string) get_post_meta( $post->ID, '_ligase_dateline', true );
+	$image_credit         = (string) get_post_meta( $post->ID, '_ligase_image_credit', true );
+	$image_license        = (string) get_post_meta( $post->ID, '_ligase_image_license', true );
+	$image_acquire        = (string) get_post_meta( $post->ID, '_ligase_image_acquire', true );
+	$citations            = (array)  get_post_meta( $post->ID, '_ligase_citations', true );
+	$override             = (array)  get_post_meta( $post->ID, '_ligase_override', true );
+	$product_override     = is_array( $override['Product'] ?? null ) ? $override['Product'] : array();
+	$post_type_obj        = get_post_type_object( $post->post_type );
+	$show_product_section = $post->post_type === 'product' && function_exists( 'wc_get_product' );
+	?>
+
+	<details style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e0e0e0;">
+		<summary style="font-weight: 600; cursor: pointer; padding: 4px 0;">
+			<?php esc_html_e( 'Pola zaawansowane', 'ligase' ); ?>
+		</summary>
+
+		<fieldset style="margin: 8px 0;">
+			<legend style="font-weight: 600; font-size: 12px; color: #444;">
+				<?php esc_html_e( 'Paywall / Subscription', 'ligase' ); ?>
+			</legend>
+			<label style="display:block; margin:6px 0; cursor:pointer;">
+				<input type="checkbox" name="_ligase_paywalled" value="1" <?php checked( $paywalled, true ); ?> />
+				<?php esc_html_e( 'Treść za paywallem (isAccessibleForFree=false)', 'ligase' ); ?>
+			</label>
+			<label style="display:block; margin:6px 0;">
+				<span style="display:block; font-size:11px; color:#646970;">
+					<?php esc_html_e( 'CSS selector zablokowanej sekcji', 'ligase' ); ?>
+				</span>
+				<input type="text" name="_ligase_paywall_selector" value="<?php echo esc_attr( $paywall_selector ); ?>"
+					placeholder=".paywall" style="width:100%;" />
+			</label>
+		</fieldset>
+
+		<fieldset style="margin: 8px 0;">
+			<legend style="font-weight: 600; font-size: 12px; color: #444;">
+				<?php esc_html_e( 'Dyscyplina dateModified', 'ligase' ); ?>
+			</legend>
+			<label style="display:block; margin:6px 0; cursor:pointer;">
+				<input type="checkbox" name="_ligase_force_date_modified" value="1" <?php checked( $force_modified, true ); ?> />
+				<?php esc_html_e( 'Wymuś emisję dateModified (domyślnie pomijane gdy < 5 min od publikacji)', 'ligase' ); ?>
+			</label>
+		</fieldset>
+
+		<fieldset style="margin: 8px 0;">
+			<legend style="font-weight: 600; font-size: 12px; color: #444;">
+				<?php esc_html_e( 'NewsArticle: dateline', 'ligase' ); ?>
+			</legend>
+			<label style="display:block; margin:6px 0;">
+				<input type="text" name="_ligase_dateline" value="<?php echo esc_attr( $dateline ); ?>"
+					placeholder="<?php esc_attr_e( 'np. WARSZAWA — 28 maj', 'ligase' ); ?>" style="width:100%;" />
+			</label>
+		</fieldset>
+
+		<fieldset style="margin: 8px 0;">
+			<legend style="font-weight: 600; font-size: 12px; color: #444;">
+				<?php esc_html_e( 'Licencja obrazu wyróżniającego', 'ligase' ); ?>
+			</legend>
+			<label style="display:block; margin:6px 0;">
+				<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'Autor / credit', 'ligase' ); ?></span>
+				<input type="text" name="_ligase_image_credit" value="<?php echo esc_attr( $image_credit ); ?>"
+					placeholder="<?php esc_attr_e( 'np. Jan Kowalski / Unsplash', 'ligase' ); ?>" style="width:100%;" />
+			</label>
+			<label style="display:block; margin:6px 0;">
+				<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'URL licencji (np. CC BY)', 'ligase' ); ?></span>
+				<input type="url" name="_ligase_image_license" value="<?php echo esc_attr( $image_license ); ?>"
+					placeholder="https://creativecommons.org/licenses/by/4.0/" style="width:100%;" />
+			</label>
+			<label style="display:block; margin:6px 0;">
+				<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'URL strony zakupu licencji (acquireLicensePage)', 'ligase' ); ?></span>
+				<input type="url" name="_ligase_image_acquire" value="<?php echo esc_attr( $image_acquire ); ?>"
+					placeholder="https://example.com/licensing" style="width:100%;" />
+			</label>
+		</fieldset>
+
+		<fieldset style="margin: 8px 0;" id="ligase-citations-section">
+			<legend style="font-weight: 600; font-size: 12px; color: #444;">
+				<?php esc_html_e( 'NewsArticle: citation (źródła)', 'ligase' ); ?>
+			</legend>
+			<?php
+			$rows = ! empty( $citations ) ? $citations : array();
+			// Always render at least one empty row so the user has somewhere to type.
+			if ( empty( $rows ) ) {
+				$rows = array( array( 'name' => '', 'url' => '' ) );
+			}
+			foreach ( $rows as $i => $row ) :
+				$name = (string) ( $row['name'] ?? '' );
+				$url  = (string) ( $row['url']  ?? '' );
+				?>
+				<div style="margin: 4px 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+					<input type="text" name="ligase_citations[<?php echo (int) $i; ?>][name]"
+						value="<?php echo esc_attr( $name ); ?>"
+						placeholder="<?php esc_attr_e( 'Tytuł źródła', 'ligase' ); ?>" />
+					<input type="url"  name="ligase_citations[<?php echo (int) $i; ?>][url]"
+						value="<?php echo esc_attr( $url ); ?>"
+						placeholder="https://…" />
+				</div>
+			<?php endforeach; ?>
+			<p style="font-size:11px; color:#646970; margin:4px 0 0;">
+				<?php esc_html_e( 'Wstaw więcej źródeł: zapisz wpis, edytor doda kolejne wiersze. Pusty wiersz jest ignorowany.', 'ligase' ); ?>
+			</p>
+		</fieldset>
+
+		<?php if ( $show_product_section ) : ?>
+			<fieldset style="margin: 8px 0;">
+				<legend style="font-weight: 600; font-size: 12px; color: #444;">
+					<?php esc_html_e( 'Product: ręczne nadpiski', 'ligase' ); ?>
+				</legend>
+				<p style="font-size:11px; color:#646970; margin:4px 0;">
+					<?php esc_html_e( 'Wpisz wartość, by nadpisać automatyczne dane WooCommerce. Pusty input = używaj auto.', 'ligase' ); ?>
+				</p>
+				<?php
+				$product_fields = array(
+					'name'                                        => array( 'label' => __( 'Nazwa', 'ligase' ),            'type' => 'text', 'placeholder' => __( 'Auto: WooCommerce name', 'ligase' ) ),
+					'gtin'                                        => array( 'label' => __( 'GTIN',  'ligase' ),            'type' => 'text', 'placeholder' => __( 'Auto: _global_unique_id', 'ligase' ) ),
+					'mpn'                                         => array( 'label' => __( 'MPN',   'ligase' ),            'type' => 'text', 'placeholder' => '' ),
+					'offers.price'                                => array( 'label' => __( 'Cena', 'ligase' ),             'type' => 'number', 'step' => '0.01', 'placeholder' => __( 'Auto: WooCommerce price', 'ligase' ) ),
+					'offers.priceCurrency'                        => array( 'label' => __( 'Waluta (ISO 4217)', 'ligase' ),'type' => 'text', 'placeholder' => __( 'np. PLN', 'ligase' ) ),
+					'offers.priceValidUntil'                      => array( 'label' => __( 'Cena ważna do', 'ligase' ),    'type' => 'date', 'placeholder' => '' ),
+					'offers.hasMerchantReturnPolicy.returnPolicyCountry' => array( 'label' => __( 'Kraj polityki zwrotów (ISO 3166-1)', 'ligase' ), 'type' => 'text', 'placeholder' => 'PL' ),
+				);
+				foreach ( $product_fields as $key => $cfg ) :
+					$val = (string) ( $product_override[ $key ] ?? '' );
+					?>
+					<label style="display:block; margin:6px 0;">
+						<span style="display:block; font-size:11px; color:#646970;">
+							<?php echo esc_html( $cfg['label'] ); ?>
+						</span>
+						<input
+							type="<?php echo esc_attr( $cfg['type'] ); ?>"
+							name="ligase_override[Product][<?php echo esc_attr( $key ); ?>]"
+							value="<?php echo esc_attr( $val ); ?>"
+							<?php if ( isset( $cfg['step'] ) ) : ?>step="<?php echo esc_attr( $cfg['step'] ); ?>"<?php endif; ?>
+							<?php if ( $cfg['placeholder'] ) : ?>placeholder="<?php echo esc_attr( $cfg['placeholder'] ); ?>"<?php endif; ?>
+							style="width:100%;"
+						/>
+					</label>
+				<?php endforeach; ?>
+			</fieldset>
+		<?php endif; ?>
+	</details>
 
 	<?php if ( class_exists( 'Ligase_Score' ) ) : ?>
 		<?php

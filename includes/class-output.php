@@ -21,9 +21,16 @@ class Ligase_Output {
         if ( $post_id ) {
             $cache_key = 'ligase_' . $post_id . '_' . get_locale() . '_' . LIGASE_VERSION;
         } else {
-            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-            $request_uri = isset( $_SERVER['REQUEST_URI'] ) ? wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
-            $cache_key   = 'ligase_arc_' . md5( $request_uri ) . '_' . get_locale() . '_' . LIGASE_VERSION;
+            // Use the queried object + context tag instead of REQUEST_URI. REQUEST_URI
+            // fragments cache across query-string variants (?utm_*, ?fbclid=...) and
+            // is theoretically poisonable. The queried-object approach gives one cache
+            // entry per logical archive page.
+            $qo_id   = (int) get_queried_object_id();
+            $context = is_archive() ? 'archive'
+                : ( is_search() ? 'search'
+                    : ( is_home() ? 'home'
+                        : ( is_front_page() ? 'front' : 'other' ) ) );
+            $cache_key = 'ligase_arc_' . $context . '_' . $qo_id . '_' . get_locale() . '_' . LIGASE_VERSION;
         }
         $cached    = Ligase_Cache::get( $cache_key );
 
@@ -47,9 +54,12 @@ class Ligase_Output {
             '@graph'   => $graph,
         ];
 
+        // Intentionally NOT using JSON_UNESCAPED_SLASHES — that flag leaves "/" un-escaped,
+        // which means "</script>" inside any string value would close the JSON-LD container.
+        // Escaping slashes is the cheapest defense; the str_replace below is belt-and-braces.
         $json = wp_json_encode(
             $payload,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+            JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
         );
 
         if ( false === $json || json_last_error() !== JSON_ERROR_NONE ) {
@@ -59,6 +69,11 @@ class Ligase_Output {
             ] );
             return;
         }
+
+        // Prevent JSON-LD container break-out via literal "</script>" in any text field.
+        // wp_json_encode does not escape this substring; without the replace, a stored post
+        // body containing </script> escapes the JSON-LD <script> tag and becomes a stored XSS.
+        $json = str_replace( [ '</', '<!--' ], [ '<\/', '<\!--' ], $json );
 
         $html = sprintf(
             "<script type=\"application/ld+json\">\n%s\n</script>\n",

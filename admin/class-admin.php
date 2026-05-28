@@ -225,9 +225,17 @@ class Ligase_Admin {
 		wp_enqueue_script(
 			'ligase-admin',
 			$this->plugin_url . 'assets/js/admin.js',
-			array( 'jquery' ),
+			array( 'jquery', 'wp-i18n' ),
 			$this->version,
 			true
+		);
+
+		// Tell WP where to look for compiled JS translations (languages/ligase-{locale}-ligase-admin.json
+		// produced via `wp i18n make-json languages/`).
+		wp_set_script_translations(
+			'ligase-admin',
+			'ligase',
+			$this->plugin_path . 'languages'
 		);
 
 		wp_localize_script( 'ligase-admin', 'LIGASE', array(
@@ -242,9 +250,14 @@ class Ligase_Admin {
 			wp_enqueue_script(
 				'ligase-gutenberg-sidebar',
 				$this->plugin_url . 'assets/js/gutenberg-sidebar.js',
-				array( 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-data', 'ligase-admin' ),
+				array( 'wp-plugins', 'wp-edit-post', 'wp-element', 'wp-components', 'wp-data', 'wp-i18n', 'ligase-admin' ),
 				$this->version,
 				true
+			);
+			wp_set_script_translations(
+				'ligase-gutenberg-sidebar',
+				'ligase',
+				$this->plugin_path . 'languages'
 			);
 		}
 	}
@@ -294,7 +307,7 @@ class Ligase_Admin {
 		// Verify nonce.
 		if (
 			! isset( $_POST['ligase_meta_nonce'] ) ||
-			! wp_verify_nonce( $_POST['ligase_meta_nonce'], 'ligase_meta_save' )
+			! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['ligase_meta_nonce'] ) ), 'ligase_meta_save' )
 		) {
 			return;
 		}
@@ -328,10 +341,149 @@ class Ligase_Admin {
 			'_ligase_enable_faq', '_ligase_enable_howto', '_ligase_enable_review',
 			'_ligase_enable_qapage', '_ligase_enable_glossary', '_ligase_enable_claimreview',
 			'_ligase_enable_software', '_ligase_enable_course', '_ligase_enable_event', '_ligase_enable_service',
+			'_ligase_enable_product', '_ligase_enable_recipe', '_ligase_enable_jobposting', '_ligase_enable_forum',
+			'_ligase_paywalled', '_ligase_force_date_modified',
 		);
 		foreach ( $toggles as $key ) {
 			$value = isset( $_POST[ $key ] ) ? '1' : '0';
 			update_post_meta( $post_id, $key, $value );
+		}
+
+		// Single-value text/url post meta (paywall selector, dateline, image license).
+		// Saved as standalone meta because they're not @type-scoped overrides.
+		$text_meta = array(
+			'_ligase_paywall_selector', '_ligase_dateline',
+			'_ligase_image_credit',
+		);
+		foreach ( $text_meta as $key ) {
+			if ( isset( $_POST[ $key ] ) ) {
+				$value = sanitize_text_field( wp_unslash( $_POST[ $key ] ) );
+				if ( $value === '' ) {
+					delete_post_meta( $post_id, $key );
+				} else {
+					update_post_meta( $post_id, $key, $value );
+				}
+			}
+		}
+		$url_meta = array( '_ligase_image_license', '_ligase_image_acquire' );
+		foreach ( $url_meta as $key ) {
+			if ( isset( $_POST[ $key ] ) ) {
+				$value = esc_url_raw( wp_unslash( $_POST[ $key ] ) );
+				if ( $value === '' ) {
+					delete_post_meta( $post_id, $key );
+				} else {
+					update_post_meta( $post_id, $key, $value );
+				}
+			}
+		}
+
+		// _ligase_citations: array of [name, url] entries posted as ligase_citations[N][name|url].
+		if ( isset( $_POST['ligase_citations'] ) && is_array( $_POST['ligase_citations'] ) ) {
+			$incoming  = wp_unslash( $_POST['ligase_citations'] );
+			$citations = array();
+			foreach ( $incoming as $row ) {
+				if ( ! is_array( $row ) ) { continue; }
+				$url  = esc_url_raw( (string) ( $row['url'] ?? '' ) );
+				$name = sanitize_text_field( (string) ( $row['name'] ?? '' ) );
+				if ( $url ) {
+					$citations[] = array( 'name' => $name, 'url' => $url );
+				}
+			}
+			if ( empty( $citations ) ) {
+				delete_post_meta( $post_id, '_ligase_citations' );
+			} else {
+				update_post_meta( $post_id, '_ligase_citations', $citations );
+			}
+		}
+
+		// Contract-driven manual overrides. Form posts `ligase_override[<Type>][<key>] = value`.
+		// We sanitize per-field using the contract's sanitize rule so type-classes never see
+		// unfiltered data. Storing only manual overrides — auto values stay in the resolver.
+		if ( class_exists( 'Ligase_Field_Contract' ) && isset( $_POST['ligase_override'] ) && is_array( $_POST['ligase_override'] ) ) {
+			$existing  = (array) get_post_meta( $post_id, '_ligase_override', true );
+			$incoming  = wp_unslash( $_POST['ligase_override'] );
+			$result    = $existing;
+
+			foreach ( $incoming as $type => $fields ) {
+				$type = sanitize_text_field( (string) $type );
+				if ( ! is_array( $fields ) ) {
+					continue;
+				}
+				$contract = Ligase_Field_Contract::get( $type );
+				$allowed  = array_keys( $contract['fields'] ?? array() );
+				$type_overrides = is_array( $result[ $type ] ?? null ) ? $result[ $type ] : array();
+
+				foreach ( $fields as $key => $raw ) {
+					$key = (string) $key;
+					if ( ! in_array( $key, $allowed, true ) ) {
+						continue;
+					}
+					$raw = is_string( $raw ) ? trim( $raw ) : $raw;
+					if ( $raw === '' || $raw === null ) {
+						// Explicit clear → drop the override so auto wins again.
+						unset( $type_overrides[ $key ] );
+						continue;
+					}
+					$def     = $contract['fields'][ $key ];
+					$sanitize = $def['sanitize'] ?? 'text';
+					$type_overrides[ $key ] = self::sanitize_override_value( $raw, $sanitize );
+				}
+
+				if ( empty( $type_overrides ) ) {
+					unset( $result[ $type ] );
+				} else {
+					$result[ $type ] = $type_overrides;
+				}
+			}
+
+			if ( empty( $result ) ) {
+				delete_post_meta( $post_id, '_ligase_override' );
+			} else {
+				update_post_meta( $post_id, '_ligase_override', $result );
+			}
+
+			// Bust schema cache for this post on override change.
+			if ( class_exists( 'Ligase_Cache' ) ) {
+				Ligase_Cache::invalidate_post( $post_id );
+			}
+		}
+	}
+
+	/**
+	 * Sanitize a single override value using the contract's sanitize rule.
+	 * Centralized here so save_meta_box stays linear.
+	 *
+	 * @param mixed  $value
+	 * @param string $rule  One of: text|html|url|int|float|date|country|currency|passthrough
+	 * @return mixed
+	 */
+	private static function sanitize_override_value( $value, string $rule ) {
+		switch ( $rule ) {
+			case 'text':
+				return is_string( $value ) ? sanitize_text_field( $value ) : '';
+			case 'html':
+				return is_string( $value ) ? wp_kses_post( $value ) : '';
+			case 'url':
+				return is_string( $value ) ? esc_url_raw( $value ) : '';
+			case 'int':
+				return (int) $value;
+			case 'float':
+				return (float) $value;
+			case 'date':
+				if ( is_string( $value ) && $value !== '' ) {
+					$ts = strtotime( $value );
+					return $ts ? gmdate( 'c', $ts ) : '';
+				}
+				return '';
+			case 'country':
+				$c = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) $value ) );
+				return ( strlen( $c ) === 2 ) ? $c : '';
+			case 'currency':
+				$c = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) $value ) );
+				return ( strlen( $c ) === 3 ) ? $c : '';
+			case 'passthrough':
+			default:
+				return is_string( $value ) ? sanitize_text_field( $value ) : $value;
 		}
 	}
 
@@ -408,7 +560,7 @@ class Ligase_Admin {
 		// Check the user-edit nonce that WordPress sets on the profile page.
 		if (
 			! isset( $_POST['_wpnonce'] ) ||
-			! wp_verify_nonce( $_POST['_wpnonce'], 'update-user_' . $user_id )
+			! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['_wpnonce'] ) ), 'update-user_' . $user_id )
 		) {
 			return;
 		}

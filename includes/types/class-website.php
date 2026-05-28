@@ -8,7 +8,7 @@ class Ligase_Type_WebSite {
         $schema = [
             '@type'     => 'WebSite',
             '@id'       => home_url( '/#website' ),
-            'name'      => esc_html( get_bloginfo( 'name' ) ),
+            'name'      => wp_strip_all_tags( get_bloginfo( 'name' ) ),
             'url'       => esc_url( home_url( '/' ) ),
             'inLanguage'=> str_replace( '_', '-', get_locale() ),
             'publisher' => [ '@id' => home_url( '/#org' ) ],

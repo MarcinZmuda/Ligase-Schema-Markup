@@ -25,7 +25,11 @@ final class Ligase_Logger {
 	private const MAX_FILE_SIZE   = 5 * 1024 * 1024; // 5 MB
 	private const MAX_ROTATIONS   = 3;
 	private const LOG_DIR_NAME    = 'ligase-logs';
-	private const LOG_FILE_NAME   = 'ligase-debug.log';
+	// .php extension is intentional — combined with the PHP-die prefix written on file
+	// creation, this makes the file safe to leak on any webserver. Apache/Nginx/LiteSpeed
+	// either deny via .htaccess/web.config OR execute the file as PHP, which dies on line 1.
+	private const LOG_FILE_NAME   = 'ligase-debug.log.php';
+	private const PHP_DIE_PREFIX  = "<?php exit; ?\x3E\n";
 
 	private static ?self $instance = null;
 
@@ -161,6 +165,13 @@ final class Ligase_Logger {
 
 		$line .= PHP_EOL;
 
+		// Seed the file with a PHP-die prefix so direct serving is safe regardless of
+		// server-side denial config (Apache/Nginx/LiteSpeed/IIS).
+		if ( ! file_exists( $this->log_file ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			file_put_contents( $this->log_file, self::PHP_DIE_PREFIX, LOCK_EX );
+		}
+
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 		file_put_contents( $this->log_file, $line, FILE_APPEND | LOCK_EX );
 	}
@@ -177,6 +188,16 @@ final class Ligase_Logger {
 		if ( ! file_exists( $htaccess ) ) {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 			file_put_contents( $htaccess, "Deny from all\n" );
+		}
+
+		// IIS protection — web.config denies HTTP access to the directory.
+		$webconfig = trailingslashit( $this->log_dir ) . 'web.config';
+		if ( ! file_exists( $webconfig ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			file_put_contents(
+				$webconfig,
+				"<configuration>\n  <system.webServer>\n    <authorization>\n      <deny users=\"*\" />\n    </authorization>\n  </system.webServer>\n</configuration>\n"
+			);
 		}
 
 		// Nginx fallback — index.php blocks directory listing and direct access

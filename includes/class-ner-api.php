@@ -107,7 +107,16 @@ class Ligase_NER_API {
 	public static function run_scheduled( int $post_id ): void {
 		$instance = new self();
 		if ( $instance->is_configured() ) {
-			$instance->extract( $post_id );
+			$result = $instance->extract( $post_id );
+			// Always bump the bulk progress counter — even on failure — so the admin
+			// UI doesn't show 0% forever after API errors. The counter is bounded by
+			// the total scheduled count when bulk was kicked off.
+			$done = (int) get_option( 'ligase_ner_bulk_done', 0 );
+			update_option( 'ligase_ner_bulk_done', $done + 1, false );
+			if ( null === $result ) {
+				$errors = (int) get_option( 'ligase_ner_bulk_errors', 0 );
+				update_option( 'ligase_ner_bulk_errors', $errors + 1, false );
+			}
 		}
 	}
 
@@ -118,10 +127,27 @@ class Ligase_NER_API {
 	 * @return int  Number of posts scheduled.
 	 */
 	public function schedule_bulk( bool $force = false ): int {
+		// Per-day rate limit — one bulk run per 24h per admin. Prevents burning the
+		// entire API budget by repeated clicks. Override with the 'ligase_ner_bulk_cooldown' filter.
+		$cooldown = (int) apply_filters( 'ligase_ner_bulk_cooldown', DAY_IN_SECONDS );
+		$last_run = (int) get_option( 'ligase_ner_bulk_last_run', 0 );
+		if ( $cooldown > 0 && ( time() - $last_run ) < $cooldown ) {
+			$wait = $cooldown - ( time() - $last_run );
+			if ( class_exists( 'Ligase_Logger' ) ) {
+				Ligase_Logger::warning( 'NER bulk schedule rejected — cooldown active', [
+					'seconds_remaining' => $wait,
+				] );
+			}
+			return -1; // sentinel: caller should explain cooldown to user
+		}
+
+		// Hard cap on number of posts per bulk run, configurable via filter.
+		$max_per_run = (int) apply_filters( 'ligase_ner_bulk_max_per_run', 500 );
+
 		$posts = get_posts( array(
 			'post_type'      => 'post',
 			'post_status'    => 'publish',
-			'posts_per_page' => -1,
+			'posts_per_page' => $max_per_run,
 			'fields'         => 'ids',
 		) );
 
@@ -146,6 +172,12 @@ class Ligase_NER_API {
 			$scheduled++;
 		}
 
+		// Reset progress tracking for a fresh bulk run.
+		update_option( 'ligase_ner_bulk_total',    $scheduled,  false );
+		update_option( 'ligase_ner_bulk_done',     0,           false );
+		update_option( 'ligase_ner_bulk_errors',   0,           false );
+		update_option( 'ligase_ner_bulk_last_run', time(),      false );
+
 		return $scheduled;
 	}
 
@@ -155,12 +187,21 @@ class Ligase_NER_API {
 	 * @return array{total: int, done: int, pending: int, percent: int}
 	 */
 	public static function get_bulk_status(): array {
-		$total = (int) wp_count_posts( 'post' )->publish;
-		$done  = (int) get_option( 'ligase_ner_bulk_done', 0 );
+		// Use the actual scheduled total, not all published posts. Otherwise progress
+		// shows e.g. 50/1000 when only 50 were scheduled, locking the UI at 5% forever.
+		$scheduled_total = (int) get_option( 'ligase_ner_bulk_total', 0 );
+		if ( $scheduled_total > 0 ) {
+			$total = $scheduled_total;
+		} else {
+			$total = (int) wp_count_posts( 'post' )->publish;
+		}
+		$done   = (int) get_option( 'ligase_ner_bulk_done',   0 );
+		$errors = (int) get_option( 'ligase_ner_bulk_errors', 0 );
 
 		return array(
 			'total'   => $total,
 			'done'    => $done,
+			'errors'  => $errors,
 			'pending' => max( 0, $total - $done ),
 			'percent' => $total > 0 ? (int) round( $done / $total * 100 ) : 0,
 		);

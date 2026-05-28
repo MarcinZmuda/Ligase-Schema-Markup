@@ -20,7 +20,7 @@ class Ligase_Type_BreadcrumbList {
         $items[] = [
             '@type'    => 'ListItem',
             'position' => $pos++,
-            'name'     => esc_html( get_bloginfo( 'name' ) ),
+            'name'     => wp_strip_all_tags( get_bloginfo( 'name' ) ),
             'item'     => esc_url( home_url( '/' ) ),
         ];
 
@@ -30,7 +30,7 @@ class Ligase_Type_BreadcrumbList {
                 $items[] = [
                     '@type'    => 'ListItem',
                     'position' => $pos++,
-                    'name'     => esc_html( $cats[0]->name ),
+                    'name'     => wp_strip_all_tags( $cats[0]->name ),
                     'item'     => esc_url( get_category_link( $cats[0]->term_id ) ),
                 ];
             }
@@ -43,7 +43,7 @@ class Ligase_Type_BreadcrumbList {
                 $items[] = [
                     '@type'    => 'ListItem',
                     'position' => $pos++,
-                    'name'     => esc_html( get_the_title( $ancestor_id ) ),
+                    'name'     => wp_strip_all_tags( get_the_title( $ancestor_id ) ),
                     'item'     => esc_url( get_permalink( $ancestor_id ) ),
                 ];
             }
@@ -58,7 +58,7 @@ class Ligase_Type_BreadcrumbList {
                 $items[] = [
                     '@type'    => 'ListItem',
                     'position' => $pos++,
-                    'name'     => esc_html( $post_type_obj->labels->name ),
+                    'name'     => wp_strip_all_tags( $post_type_obj->labels->name ),
                     'item'     => esc_url( $archive_link ),
                 ];
             }
@@ -77,7 +77,7 @@ class Ligase_Type_BreadcrumbList {
                             $items[] = [
                                 '@type'    => 'ListItem',
                                 'position' => $pos++,
-                                'name'     => esc_html( $ancestor->name ),
+                                'name'     => wp_strip_all_tags( $ancestor->name ),
                                 'item'     => esc_url( get_term_link( $ancestor ) ),
                             ];
                         }
@@ -86,7 +86,7 @@ class Ligase_Type_BreadcrumbList {
                 $items[] = [
                     '@type'    => 'ListItem',
                     'position' => $pos,
-                    'name'     => esc_html( $term->name ),
+                    'name'     => wp_strip_all_tags( $term->name ),
                 ];
             }
 
@@ -103,7 +103,7 @@ class Ligase_Type_BreadcrumbList {
         $last_item = [
             '@type'    => 'ListItem',
             'position' => $pos,
-            'name'     => esc_html( get_the_title() ),
+            'name'     => wp_strip_all_tags( get_the_title() ),
         ];
         // Add URL to current page — Google recommends it for richer display
         $permalink = get_permalink();

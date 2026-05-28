@@ -35,6 +35,10 @@ class Ligase_Schema_Rules {
 		'AudioObject'         => '_ligase_enable_audio',
 		'Course'              => '_ligase_enable_course',
 		'Event'               => '_ligase_enable_event',
+		'Product'             => '_ligase_enable_product',
+		'Recipe'              => '_ligase_enable_recipe',
+		'JobPosting'          => '_ligase_enable_jobposting',
+		'DiscussionForumPosting' => '_ligase_enable_forum',
 	);
 
 	/**

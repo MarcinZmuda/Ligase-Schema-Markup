@@ -84,6 +84,58 @@ final class Ligase_Entity_Extractor_NER {
 	 *     products:      list<array{name: string, type: string, frequency: int, positions: int}>,
 	 * }
 	 */
+	/**
+	 * Extract entities from raw content (no WP post required).
+	 *
+	 * Returns a flat list of entities with schema.org-style `@type` (Person /
+	 * Organization / Place / Product). Each entity also retains its lowercase
+	 * `type` for backwards compatibility with existing internal consumers.
+	 *
+	 * @param string $content
+	 * @return list<array{name: string, '@type': string, type: string, frequency: int, positions: int}>
+	 */
+	public function extract( string $content ): array {
+		$content = wp_strip_all_tags( $content );
+
+		if ( '' === trim( $content ) ) {
+			return [];
+		}
+
+		if ( mb_strlen( $content ) > 50000 ) {
+			$content = mb_substr( $content, 0, 50000 );
+		}
+
+		$persons       = $this->detect_persons( $content );
+		$organizations = $this->detect_organizations( $content );
+		$places        = $this->detect_places( $content );
+		$products      = $this->detect_products( $content );
+
+		$org_names   = array_map( fn( array $e ): string => mb_strtolower( $e['name'] ), $organizations );
+		$place_names = array_map( fn( array $e ): string => mb_strtolower( $e['name'] ), $places );
+		$prod_names  = array_map( fn( array $e ): string => mb_strtolower( $e['name'] ), $products );
+
+		$persons = array_values( array_filter(
+			$persons,
+			fn( array $e ): bool => ! in_array( mb_strtolower( $e['name'] ), [ ...$org_names, ...$place_names, ...$prod_names ], true ),
+		) );
+
+		$type_map = [
+			'person'       => 'Person',
+			'organization' => 'Organization',
+			'place'        => 'Place',
+			'product'      => 'Product',
+		];
+
+		$flat = [];
+		foreach ( [ $persons, $organizations, $places, $products ] as $bucket ) {
+			foreach ( $bucket as $entity ) {
+				$entity['@type'] = $type_map[ $entity['type'] ] ?? ucfirst( $entity['type'] );
+				$flat[] = $entity;
+			}
+		}
+		return $flat;
+	}
+
 	public function extract_from_post( int $post_id ): array {
 		$post = get_post( $post_id );
 
@@ -187,8 +239,11 @@ final class Ligase_Entity_Extractor_NER {
 	 */
 	private function detect_places( string $content ): array {
 		// Polish prepositions: w, na, z, do, we, ze, nad, pod, przy
-		// English prepositions: in, at, from, near, to
-		$prepositions = 'w|we|na|z|ze|do|nad|pod|przy|in|at|from|near|to';
+		// English prepositions: in, at, from, near
+		// "to" intentionally REMOVED — in Polish it's a demonstrative pronoun ("this/that")
+		// that triggers false-positive places on every sentence beginning with "To ...".
+		// In English it's rarely a locative preposition anyway.
+		$prepositions = 'w|we|na|z|ze|do|nad|pod|przy|in|at|from|near';
 
 		$pattern = '/(?<=\b(?:' . $prepositions . ')\s)((?:\p{Lu}\p{L}+)(?:\s+\p{Lu}\p{L}+){0,2})/u';
 
@@ -316,7 +371,11 @@ final class Ligase_Entity_Extractor_NER {
 		$seen = [];
 
 		foreach ( $entities as $entity ) {
-			$key = mb_strtolower( $entity['name'] );
+			// Use a Polish-stem-aware key so inflected variants of the same name
+			// ("Jan Kowalski", "Jana Kowalskiego", "Janowi Kowalskiemu") deduplicate
+			// to a single entity. Without this, the same person becomes 3 entities
+			// with frequency=1 each, missing the threshold for Wikidata scheduling.
+			$key = $this->stem_key( $entity['name'] );
 
 			if ( isset( $seen[ $key ] ) ) {
 				++$seen[ $key ]['frequency'];
@@ -326,6 +385,33 @@ final class Ligase_Entity_Extractor_NER {
 		}
 
 		return array_values( $seen );
+	}
+
+	/**
+	 * Polish-aware normalisation key for deduplication. Lowercases, then strips a
+	 * single common inflectional ending from each word. Returns the joined stems.
+	 *
+	 * Not a real lemmatizer — just enough to fold the most common cases:
+	 * genitive -a/-i/-y/-ego/-iej, dative -owi/-emu, accusative -ę/-ą,
+	 * instrumental -em/-ą/-ami, locative -u/-e/-ach.
+	 */
+	private function stem_key( string $name ): string {
+		$lower = mb_strtolower( $name );
+		$words = preg_split( '/\s+/u', $lower ) ?: [];
+		$endings = [ 'owi', 'ego', 'emu', 'iej', 'ami', 'ach', 'om', 'em', 'ie', 'iu', 'ej', 'go', 'mu', 'ą', 'ę', 'a', 'i', 'y', 'o', 'u', 'e' ];
+		$stems = [];
+		foreach ( $words as $word ) {
+			$stem = $word;
+			foreach ( $endings as $ending ) {
+				$elen = mb_strlen( $ending );
+				if ( mb_strlen( $word ) - $elen >= 3 && mb_substr( $word, -$elen ) === $ending ) {
+					$stem = mb_substr( $word, 0, -$elen );
+					break;
+				}
+			}
+			$stems[] = $stem;
+		}
+		return implode( ' ', $stems );
 	}
 
 	/**
