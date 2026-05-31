@@ -83,6 +83,112 @@ $allowed_schema_types = array( 'BlogPosting', 'Article', 'NewsArticle', 'TechArt
 	<div id="ligase-validate-all-list" style="margin-top:8px;"></div>
 </div>
 
+<!-- =====================================================================
+	BULK SCHEMA FLAGS — set Service/FAQ/HowTo/Product/Recipe/... on many posts at once
+	===================================================================== -->
+<details style="margin-bottom:16px;padding:14px 18px;background:#fff;border:1px solid #ddd;border-radius:4px;">
+	<summary style="font-weight:600;font-size:14px;cursor:pointer;">
+		⚡ <?php esc_html_e( 'Masowe ustawianie znaczników schema (Service, FAQ, HowTo, Product…)', 'ligase' ); ?>
+	</summary>
+
+	<p style="margin:10px 0 6px;color:#646970;font-size:12px;">
+		<?php esc_html_e( 'Wybierz typ wpisu i (opcjonalnie) kategorię/tag, a następnie zaznacz znaczniki które chcesz włączyć lub wyłączyć dla wszystkich pasujących pozycji.', 'ligase' ); ?>
+	</p>
+
+	<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;">
+
+		<!-- LEFT: scope filters -->
+		<div>
+			<h4 style="margin:8px 0 6px;font-size:13px;"><?php esc_html_e( 'Zakres', 'ligase' ); ?></h4>
+
+			<label style="display:block;margin:6px 0;font-size:12px;">
+				<span style="display:block;color:#646970;margin-bottom:2px;"><?php esc_html_e( 'Typ wpisu', 'ligase' ); ?></span>
+				<select id="ligase-bulk-flags-posttype" style="width:100%;">
+					<?php
+					$post_types_args   = array( 'public' => true );
+					$bulk_post_types   = get_post_types( $post_types_args, 'objects' );
+					foreach ( $bulk_post_types as $slug => $pt_obj ) :
+						if ( $slug === 'attachment' ) { continue; }
+						?>
+						<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $slug, 'post' ); ?>>
+							<?php echo esc_html( $pt_obj->labels->name . ' (' . $slug . ')' ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+
+			<label style="display:block;margin:6px 0;font-size:12px;">
+				<span style="display:block;color:#646970;margin-bottom:2px;"><?php esc_html_e( 'Tylko w kategorii / tagu (opcjonalne)', 'ligase' ); ?></span>
+				<input type="text" id="ligase-bulk-flags-term" placeholder="<?php esc_attr_e( 'slug taksonomii, np. adwokat-rozwod', 'ligase' ); ?>" style="width:100%;" />
+				<small style="color:#9a9a9a;font-size:11px;">
+					<?php esc_html_e( 'Wpisz slug terminu (z dowolnej taksonomii). Puste = wszystkie wpisy danego typu.', 'ligase' ); ?>
+				</small>
+			</label>
+
+			<h4 style="margin:14px 0 6px;font-size:13px;"><?php esc_html_e( 'Wariant Article (tylko dla post)', 'ligase' ); ?></h4>
+			<label style="display:block;margin:6px 0;font-size:12px;">
+				<select id="ligase-bulk-flags-variant" style="width:100%;">
+					<option value=""><?php esc_html_e( '— nie zmieniaj —', 'ligase' ); ?></option>
+					<option value="BlogPosting">BlogPosting</option>
+					<option value="Article">Article</option>
+					<option value="NewsArticle">NewsArticle</option>
+					<option value="TechArticle">TechArticle</option>
+					<option value="LiveBlogPosting">LiveBlogPosting</option>
+				</select>
+			</label>
+		</div>
+
+		<!-- RIGHT: schema flag checkboxes -->
+		<div>
+			<h4 style="margin:8px 0 6px;font-size:13px;"><?php esc_html_e( 'Znaczniki schema do włączenia / wyłączenia', 'ligase' ); ?></h4>
+			<?php
+			$bulk_flags = array(
+				'_ligase_enable_service'      => 'Service',
+				'_ligase_enable_faq'          => 'FAQPage',
+				'_ligase_enable_howto'        => 'HowTo',
+				'_ligase_enable_review'       => 'Review',
+				'_ligase_enable_qapage'       => 'QAPage',
+				'_ligase_enable_product'      => 'Product',
+				'_ligase_enable_recipe'       => 'Recipe',
+				'_ligase_enable_jobposting'   => 'JobPosting',
+				'_ligase_enable_forum'        => 'DiscussionForumPosting',
+				'_ligase_enable_course'       => 'Course',
+				'_ligase_enable_event'        => 'Event',
+				'_ligase_enable_software'     => 'SoftwareApplication',
+				'_ligase_enable_glossary'     => 'DefinedTerm',
+				'_ligase_enable_claimreview'  => 'ClaimReview (deprecated)',
+				'_ligase_enable_profile_page' => 'ProfilePage',
+				'_ligase_paywalled'           => 'Paywall (isAccessibleForFree=false)',
+			);
+			?>
+			<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px;">
+				<?php foreach ( $bulk_flags as $meta_key => $label ) : ?>
+					<label style="display:flex;align-items:center;gap:4px;">
+						<input type="checkbox" class="ligase-bulk-flag" data-meta-key="<?php echo esc_attr( $meta_key ); ?>" />
+						<?php echo esc_html( $label ); ?>
+					</label>
+				<?php endforeach; ?>
+			</div>
+
+			<div style="margin-top:10px;font-size:12px;">
+				<span style="color:#646970;"><?php esc_html_e( 'Akcja na zaznaczonych:', 'ligase' ); ?></span>
+				<label style="margin-left:8px;"><input type="radio" name="ligase_bulk_action" value="enable" checked /> <?php esc_html_e( 'Włącz', 'ligase' ); ?></label>
+				<label style="margin-left:8px;"><input type="radio" name="ligase_bulk_action" value="disable" /> <?php esc_html_e( 'Wyłącz', 'ligase' ); ?></label>
+			</div>
+		</div>
+	</div>
+
+	<div style="margin-top:14px;padding-top:10px;border-top:1px solid #eee;display:flex;gap:8px;align-items:center;">
+		<button type="button" class="button button-primary" id="ligase-bulk-flags-apply">
+			<?php esc_html_e( 'Zastosuj do pasujących wpisów', 'ligase' ); ?>
+		</button>
+		<button type="button" class="button" id="ligase-bulk-flags-preview">
+			<?php esc_html_e( 'Najpierw pokaż ile pozycji', 'ligase' ); ?>
+		</button>
+		<span id="ligase-bulk-flags-status" style="font-size:12px;color:#666;"></span>
+	</div>
+</details>
+
 <div id="ligase-posts-notice" class="ligase-notice" style="display:none;"></div>
 
 <table class="wp-list-table widefat fixed striped ligase-posts-table">
@@ -278,6 +384,96 @@ $('#ligase-bulk-type-btn').on('click', function() {
 	}).fail(function() {
 		$status.css('color', '#EF4444').text('❌ Błąd połączenia');
 		$btn.prop('disabled', false).text('Zastosuj');
+	});
+});
+
+// =====================================================================
+// Bulk schema flags — handlers for the new "Masowe ustawianie znaczników" panel
+// =====================================================================
+function ligaseBulkCollectFlags() {
+	var flags = [];
+	$('.ligase-bulk-flag:checked').each(function() {
+		flags.push($(this).data('meta-key'));
+	});
+	return flags;
+}
+
+function ligaseBulkPayload() {
+	return {
+		nonce:     LIGASE.nonce,
+		post_type: $('#ligase-bulk-flags-posttype').val() || 'post',
+		term_slug: $.trim($('#ligase-bulk-flags-term').val() || ''),
+		variant:   $('#ligase-bulk-flags-variant').val() || '',
+		flags:     ligaseBulkCollectFlags(),
+		action_kind: $('input[name="ligase_bulk_action"]:checked').val() || 'enable'
+	};
+}
+
+// Preview — count matching posts
+$('#ligase-bulk-flags-preview').on('click', function() {
+	var $btn    = $(this);
+	var $status = $('#ligase-bulk-flags-status');
+	$btn.prop('disabled', true);
+	$status.css('color', '#666').text('Liczenie…');
+
+	var payload = ligaseBulkPayload();
+	$.post(LIGASE.ajaxUrl, {
+		action:    'ligase_bulk_count_targets',
+		nonce:     payload.nonce,
+		post_type: payload.post_type,
+		term_slug: payload.term_slug
+	}).done(function(res) {
+		if (res.success) {
+			$status.css('color', '#10B981').text('Znaleziono ' + res.data.count + ' pozycji typu "' + res.data.post_type + '"' + (res.data.term_slug ? ' w terminie "' + res.data.term_slug + '"' : ''));
+		} else {
+			$status.css('color', '#EF4444').text('❌ ' + (res.data.message || 'Błąd'));
+		}
+		$btn.prop('disabled', false);
+	}).fail(function() {
+		$status.css('color', '#EF4444').text('❌ Błąd połączenia');
+		$btn.prop('disabled', false);
+	});
+});
+
+// Apply — actually update meta
+$('#ligase-bulk-flags-apply').on('click', function() {
+	var payload = ligaseBulkPayload();
+	if (payload.flags.length === 0 && !payload.variant) {
+		alert('Zaznacz przynajmniej jeden znacznik schema albo wybierz wariant Article.');
+		return;
+	}
+	var verb = payload.action_kind === 'disable' ? 'WYŁĄCZYĆ' : 'WŁĄCZYĆ';
+	var flagSummary = payload.flags.length ? (verb + ' znaczniki: ' + payload.flags.join(', ')) : '';
+	var variantSummary = payload.variant ? ('Ustawić wariant Article: ' + payload.variant) : '';
+	var msg = 'Czy na pewno?\n\nTyp: ' + payload.post_type + (payload.term_slug ? ' (termin: ' + payload.term_slug + ')' : '') + '\n' + flagSummary + (flagSummary && variantSummary ? '\n' : '') + variantSummary;
+	if (!confirm(msg)) { return; }
+
+	var $btn    = $(this);
+	var $status = $('#ligase-bulk-flags-status');
+	$btn.prop('disabled', true).text('Aktualizuję…');
+	$status.css('color', '#666').text('');
+
+	$.post(LIGASE.ajaxUrl, {
+		action:      'ligase_bulk_set_flags',
+		nonce:       payload.nonce,
+		post_type:   payload.post_type,
+		term_slug:   payload.term_slug,
+		variant:     payload.variant,
+		flags:       payload.flags,
+		action_kind: payload.action_kind
+	}).done(function(res) {
+		if (res.success) {
+			$status.css('color', '#10B981').text(
+				'✅ Zaktualizowano ' + res.data.updated + ' z ' + res.data.matched + ' pozycji.' +
+				(res.data.flags && res.data.flags.length ? ' Wartość znaczników: ' + res.data.value : '')
+			);
+		} else {
+			$status.css('color', '#EF4444').text('❌ ' + (res.data.message || 'Błąd'));
+		}
+		$btn.prop('disabled', false).text('Zastosuj do pasujących wpisów');
+	}).fail(function() {
+		$status.css('color', '#EF4444').text('❌ Błąd połączenia');
+		$btn.prop('disabled', false).text('Zastosuj do pasujących wpisów');
 	});
 });
 

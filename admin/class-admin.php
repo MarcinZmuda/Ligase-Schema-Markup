@@ -92,11 +92,9 @@ class Ligase_Admin {
 				'slug'  => 'ligase-encje',
 				'cap'   => 'manage_options',
 			),
-			array(
-				'title' => __( 'Narz\u0119dzia', 'ligase' ),
-				'slug'  => 'ligase-narzedzia',
-				'cap'   => 'manage_options',
-			),
+			// "Narz\u0119dzia" submenu retired in 2.4.3 \u2014 actions moved to the Posty page
+			// (bulk schema flags) and Ustawienia (clear cache, import/export). The
+			// tools.php view itself stays on disk for back-compat with any deep links.
 		);
 	}
 

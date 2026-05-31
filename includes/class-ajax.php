@@ -58,6 +58,8 @@ class Ligase_Ajax {
 			'ligase_delete_schema_rule',
 			'ligase_toggle_schema_rule',
 			'ligase_bulk_change_schema_type',
+			'ligase_bulk_set_flags',
+			'ligase_bulk_count_targets',
 		);
 
 		foreach ( $actions as $action ) {
@@ -1300,6 +1302,151 @@ class Ligase_Ajax {
 		Ligase_Logger::info( 'Bulk schema type change.', array( 'type' => $type, 'updated' => $updated ) );
 
 		wp_send_json_success( array( 'updated' => $updated, 'type' => $type ) );
+	}
+
+	/**
+	 * Bulk set/unset schema toggle flags across many posts.
+	 *
+	 * Accepts:
+	 *   - post_type (string)       — limit to one CPT (post|page|product|...)
+	 *   - term_slug (string, opt)  — limit to posts in this term slug (any taxonomy)
+	 *   - flags     (array)        — list of `_ligase_enable_*` meta keys to update
+	 *   - action    (enable|disable) — set to '1' or '0'
+	 *   - variant   (string, opt)  — Article variant for Posty (sets _ligase_schema_type)
+	 *
+	 * Returns counts: matched / updated.
+	 */
+	public function handle_ligase_bulk_set_flags(): void {
+		$this->verify_request();
+
+		$post_type = isset( $_POST['post_type'] ) ? sanitize_key( wp_unslash( $_POST['post_type'] ) ) : 'post';
+		$term_slug = isset( $_POST['term_slug'] ) ? sanitize_title( wp_unslash( $_POST['term_slug'] ) ) : '';
+		$action    = isset( $_POST['action_kind'] ) ? sanitize_key( wp_unslash( $_POST['action_kind'] ) ) : 'enable';
+		$variant   = isset( $_POST['variant'] )   ? sanitize_text_field( wp_unslash( $_POST['variant'] ) ) : '';
+		$flags     = isset( $_POST['flags'] ) && is_array( $_POST['flags'] )
+			? array_map( 'sanitize_key', wp_unslash( $_POST['flags'] ) )
+			: array();
+
+		// Whitelist of allowed flag keys (mirror of the metabox toggle list).
+		$allowed_flags = array(
+			'_ligase_enable_service', '_ligase_enable_faq', '_ligase_enable_howto',
+			'_ligase_enable_review', '_ligase_enable_qapage', '_ligase_enable_product',
+			'_ligase_enable_recipe', '_ligase_enable_jobposting', '_ligase_enable_forum',
+			'_ligase_enable_course', '_ligase_enable_event', '_ligase_enable_software',
+			'_ligase_enable_glossary', '_ligase_enable_claimreview',
+			'_ligase_enable_profile_page', '_ligase_paywalled',
+		);
+		$flags = array_values( array_intersect( $flags, $allowed_flags ) );
+
+		$allowed_variants = array( 'BlogPosting', 'Article', 'NewsArticle', 'TechArticle', 'LiveBlogPosting' );
+		if ( $variant !== '' && ! in_array( $variant, $allowed_variants, true ) ) {
+			$variant = '';
+		}
+
+		$value = $action === 'disable' ? '0' : '1';
+
+		$post_ids = $this->bulk_resolve_post_ids( $post_type, $term_slug );
+		if ( empty( $post_ids ) ) {
+			wp_send_json_success( array( 'matched' => 0, 'updated' => 0, 'message' => __( 'Brak pozycji pasujących do filtra.', 'ligase' ) ) );
+		}
+
+		$updated = 0;
+		foreach ( $post_ids as $pid ) {
+			$pid     = (int) $pid;
+			$changed = false;
+			foreach ( $flags as $key ) {
+				update_post_meta( $pid, $key, $value );
+				$changed = true;
+			}
+			if ( $variant !== '' ) {
+				update_post_meta( $pid, '_ligase_schema_type', $variant );
+				$changed = true;
+			}
+			if ( $changed ) {
+				$updated++;
+				if ( class_exists( 'Ligase_Cache' ) ) {
+					Ligase_Cache::invalidate_post( $pid );
+				}
+			}
+		}
+
+		Ligase_Logger::info( 'Bulk flag set', array(
+			'post_type' => $post_type,
+			'term'      => $term_slug,
+			'flags'     => $flags,
+			'variant'   => $variant,
+			'value'     => $value,
+			'matched'   => count( $post_ids ),
+			'updated'   => $updated,
+		) );
+
+		wp_send_json_success( array(
+			'matched' => count( $post_ids ),
+			'updated' => $updated,
+			'flags'   => $flags,
+			'value'   => $value,
+		) );
+	}
+
+	/**
+	 * Preview: just count how many posts would match the bulk filter.
+	 */
+	public function handle_ligase_bulk_count_targets(): void {
+		$this->verify_request();
+
+		$post_type = isset( $_POST['post_type'] ) ? sanitize_key( wp_unslash( $_POST['post_type'] ) ) : 'post';
+		$term_slug = isset( $_POST['term_slug'] ) ? sanitize_title( wp_unslash( $_POST['term_slug'] ) ) : '';
+
+		$post_ids = $this->bulk_resolve_post_ids( $post_type, $term_slug );
+		wp_send_json_success( array(
+			'count'     => count( $post_ids ),
+			'post_type' => $post_type,
+			'term_slug' => $term_slug,
+		) );
+	}
+
+	/**
+	 * Resolve target post IDs for bulk operations. When `term_slug` is provided,
+	 * search every taxonomy attached to the post type for a term with that slug;
+	 * use the first match (most users don't have collision between taxonomies).
+	 *
+	 * @return int[]
+	 */
+	private function bulk_resolve_post_ids( string $post_type, string $term_slug ): array {
+		$args = array(
+			'post_type'      => $post_type,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+			'orderby'        => 'ID',
+			'order'          => 'ASC',
+		);
+
+		if ( $term_slug !== '' ) {
+			$tax_query = array();
+			foreach ( get_object_taxonomies( $post_type ) as $tax ) {
+				$term = get_term_by( 'slug', $term_slug, $tax );
+				if ( $term instanceof WP_Term ) {
+					$tax_query[] = array(
+						'taxonomy' => $tax,
+						'field'    => 'slug',
+						'terms'    => array( $term_slug ),
+					);
+					break; // First taxonomy match wins
+				}
+			}
+			if ( ! empty( $tax_query ) ) {
+				$args['tax_query'] = $tax_query;
+			} else {
+				// User specified a term slug but it doesn't exist on any taxonomy
+				// for this post type → safer to return nothing than every post.
+				return array();
+			}
+		}
+
+		$ids = get_posts( $args );
+		return is_array( $ids ) ? array_map( 'intval', $ids ) : array();
 	}
 
 }
