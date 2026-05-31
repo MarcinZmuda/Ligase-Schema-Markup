@@ -502,42 +502,105 @@ class Ligase_Admin {
 			return;
 		}
 
+		// Each field carries its own input type + hint so a single render loop
+		// handles text / url / tel / textarea uniformly.
 		$fields = array(
-			'ligase_honorific'   => __( 'Tytul (dr., prof., mgr.)', 'ligase' ),
-			'ligase_job_title'   => __( 'Stanowisko (Job Title)', 'ligase' ),
-			'ligase_knows_about' => __( 'Zna sie na (Knows About)', 'ligase' ),
-			'ligase_alumni_of'   => __( 'Uczelnia (alumniOf)', 'ligase' ),
-			'ligase_credential'  => __( 'Certyfikat / kwalifikacja', 'ligase' ),
-			'ligase_linkedin'    => __( 'LinkedIn URL', 'ligase' ),
-			'ligase_twitter'     => __( 'Twitter / X URL', 'ligase' ),
-			'ligase_wikidata'    => __( 'Wikidata URL', 'ligase' ),
+			// --- Identity ---
+			'ligase_given_name'   => array( 'label' => __( 'Imię (givenName)', 'ligase' ), 'type' => 'text',
+				'hint' => __( 'Domyślnie z pola WP "Imię". Wpisz tylko jeśli display_name nie da się sensownie rozbić.', 'ligase' ) ),
+			'ligase_family_name'  => array( 'label' => __( 'Nazwisko (familyName)', 'ligase' ), 'type' => 'text',
+				'hint' => __( 'Domyślnie z pola WP "Nazwisko".', 'ligase' ) ),
+			'ligase_honorific'    => array( 'label' => __( 'Tytuł (honorificPrefix: dr / prof / mgr)', 'ligase' ), 'type' => 'text' ),
+			'ligase_job_title'    => array( 'label' => __( 'Stanowisko (jobTitle)', 'ligase' ), 'type' => 'text',
+				'hint' => __( 'np. Radca prawny / Senior PHP Developer / Editor-in-Chief', 'ligase' ) ),
+
+			// --- Contact ---
+			'ligase_telephone'    => array( 'label' => __( 'Telefon (Person.telephone)', 'ligase' ), 'type' => 'tel',
+				'hint' => __( 'Telefon osobisty/służbowy. Inny niż telefon Organization.', 'ligase' ) ),
+			'ligase_publish_email' => array( 'label' => __( 'Publikuj email konta WP w Person.email', 'ligase' ), 'type' => 'checkbox',
+				'hint' => __( 'Domyślnie wyłączone — email nie wycieka do JSON-LD bez Twojej zgody.', 'ligase' ) ),
+
+			// --- Languages + expertise ---
+			'ligase_knows_language' => array( 'label' => __( 'Znane języki (knowsLanguage) — CSV', 'ligase' ), 'type' => 'text',
+				'hint' => __( 'Kody ISO 639-1 oddzielone przecinkiem, np: pl, en, de', 'ligase' ) ),
+			'ligase_knows_about'   => array( 'label' => __( 'Specjalizacje (knowsAbout) — CSV', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Lista tematów rozdzielona przecinkami. To kluczowy sygnał E-E-A-T dla AI.', 'ligase' ) ),
+
+			// --- Education ---
+			'ligase_alumni_of'     => array( 'label' => __( 'Uczelnia (alumniOf — name)', 'ligase' ), 'type' => 'text',
+				'hint' => __( 'Pełna nazwa uczelni, np: Uniwersytet Marii Curie-Skłodowskiej w Lublinie', 'ligase' ) ),
+			'ligase_alumni_of_url' => array( 'label' => __( 'Uczelnia — URL', 'ligase' ), 'type' => 'url',
+				'hint' => __( 'np. https://www.umcs.pl/', 'ligase' ) ),
+			'ligase_alumni_of_dept' => array( 'label' => __( 'Wydział (department)', 'ligase' ), 'type' => 'text',
+				'hint' => __( 'np. Wydział Prawa i Administracji', 'ligase' ) ),
+
+			// --- Credentials (repeater) ---
+			'ligase_credentials'   => array( 'label' => __( 'Uprawnienia / dyplomy (hasCredential)', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Jeden wpis na linię. Format: Nazwa | category | Wydawca | URL wydawcy | identyfikator | rok\nCategory: license / degree / certification / membership / award\nPrzykład:\nWpis na listę Radców Prawnych | license | Okręgowa Izba Radców Prawnych w Lublinie | https://oirp.lublin.pl/ | LB-2187 | 2013\nMagister prawa | degree | Uniwersytet Marii Curie-Skłodowskiej | https://umcs.pl/ |  | 2010', 'ligase' ) ),
+
+			// --- Membership ---
+			'ligase_member_of'     => array( 'label' => __( 'Członek organizacji (memberOf)', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Jeden wpis na linię, format: Nazwa | URL\nnp: Okręgowa Izba Radców Prawnych w Lublinie | https://oirp.lublin.pl/', 'ligase' ) ),
+
+			// --- sameAs override / extras ---
+			'ligase_extra_sameas'  => array( 'label' => __( 'Dodatkowe sameAs (URL/linia)', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Profile zewnętrzne których WP nie zbiera: ORCID, Google Scholar, własny katalog branżowy itd. Po jednym URL na linię.\nProfile FB/Instagram/LinkedIn/X/YouTube/Pinterest/Wikipedia są zbierane automatycznie z pól kontaktowych WP.', 'ligase' ) ),
+
+			// --- Legacy explicit URL fields (kept for backward compat) ---
+			'ligase_linkedin'      => array( 'label' => __( 'LinkedIn URL (legacy)', 'ligase' ), 'type' => 'url',
+				'hint' => __( 'Pole WP "LinkedIn URL" też jest czytane — to legacy fallback.', 'ligase' ) ),
+			'ligase_wikidata'      => array( 'label' => __( 'Wikidata URL', 'ligase' ), 'type' => 'url',
+				'hint' => __( 'np. https://www.wikidata.org/wiki/Q12345 — najsilniejszy sygnał tożsamości encji.', 'ligase' ) ),
+
+			// --- Image override ---
+			'ligase_image_url'     => array( 'label' => __( 'Zdjęcie profilowe — URL', 'ligase' ), 'type' => 'url',
+				'hint' => __( 'Override Gravatara. Min 400×400 px, kwadrat, twarz wycentrowana.', 'ligase' ) ),
 		);
 
-		$url_fields = array( 'ligase_linkedin', 'ligase_twitter', 'ligase_wikidata' );
-
 		?>
-		<h3><?php esc_html_e( 'Ligase &mdash; Profil autora', 'ligase' ); ?></h3>
+		<h3 id="ligase-author-section"><?php esc_html_e( 'Ligase — Profil autora (Person schema)', 'ligase' ); ?></h3>
+		<p class="description" style="max-width:60em;">
+			<?php esc_html_e( 'Pełniejsze dane Person = silniejszy sygnał E-E-A-T dla Google AI Overviews oraz cytowalności w LLM. Profile FB/Instagram/X/YouTube/Wikipedia z pól kontaktowych WordPress są zbierane automatycznie do sameAs.', 'ligase' ); ?>
+		</p>
 		<table class="form-table" role="presentation">
-			<?php foreach ( $fields as $key => $label ) : ?>
+			<?php foreach ( $fields as $key => $cfg ) :
+				$value = get_user_meta( $user->ID, $key, true );
+				$type  = $cfg['type'] ?? 'text';
+				?>
 				<tr>
-					<th><label for="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $label ); ?></label></th>
+					<th>
+						<label for="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $cfg['label'] ); ?></label>
+					</th>
 					<td>
-						<?php if ( in_array( $key, $url_fields, true ) ) : ?>
-							<input
-								type="url"
+						<?php if ( $type === 'textarea' ) : ?>
+							<textarea
 								id="<?php echo esc_attr( $key ); ?>"
 								name="<?php echo esc_attr( $key ); ?>"
-								value="<?php echo esc_url( get_user_meta( $user->ID, $key, true ) ); ?>"
-								class="regular-text"
-							/>
+								rows="<?php echo $key === 'ligase_credentials' ? 6 : 3; ?>"
+								class="large-text code"
+							><?php echo esc_textarea( (string) $value ); ?></textarea>
+						<?php elseif ( $type === 'checkbox' ) : ?>
+							<label>
+								<input
+									type="checkbox"
+									id="<?php echo esc_attr( $key ); ?>"
+									name="<?php echo esc_attr( $key ); ?>"
+									value="1"
+									<?php checked( $value, '1' ); ?>
+								/>
+								<?php esc_html_e( 'Włącz', 'ligase' ); ?>
+							</label>
 						<?php else : ?>
 							<input
-								type="text"
+								type="<?php echo esc_attr( $type ); ?>"
 								id="<?php echo esc_attr( $key ); ?>"
 								name="<?php echo esc_attr( $key ); ?>"
-								value="<?php echo esc_attr( get_user_meta( $user->ID, $key, true ) ); ?>"
+								value="<?php echo $type === 'url' ? esc_url( (string) $value ) : esc_attr( (string) $value ); ?>"
 								class="regular-text"
 							/>
+						<?php endif; ?>
+						<?php if ( ! empty( $cfg['hint'] ) ) : ?>
+							<p class="description" style="white-space: pre-line;"><?php echo esc_html( $cfg['hint'] ); ?></p>
 						<?php endif; ?>
 					</td>
 				</tr>
@@ -565,19 +628,52 @@ class Ligase_Admin {
 			return;
 		}
 
-		$text_fields = array( 'ligase_honorific', 'ligase_job_title', 'ligase_knows_about', 'ligase_alumni_of', 'ligase_credential' );
-		$url_fields  = array( 'ligase_linkedin', 'ligase_twitter', 'ligase_wikidata' );
-
+		// Short-text Person fields
+		$text_fields = array(
+			'ligase_given_name', 'ligase_family_name', 'ligase_honorific',
+			'ligase_job_title', 'ligase_telephone', 'ligase_knows_language',
+			'ligase_alumni_of', 'ligase_alumni_of_dept', 'ligase_credential', // ligase_credential kept for backward compat
+		);
 		foreach ( $text_fields as $key ) {
 			if ( isset( $_POST[ $key ] ) ) {
 				update_user_meta( $user_id, $key, sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) );
 			}
 		}
 
+		// URL fields
+		$url_fields = array(
+			'ligase_linkedin', 'ligase_twitter', 'ligase_wikidata',
+			'ligase_alumni_of_url', 'ligase_image_url',
+		);
 		foreach ( $url_fields as $key ) {
 			if ( isset( $_POST[ $key ] ) ) {
 				update_user_meta( $user_id, $key, esc_url_raw( wp_unslash( $_POST[ $key ] ) ) );
 			}
 		}
+
+		// Multiline textarea fields — preserve newlines, strip tags. wp_kses_post would
+		// allow inline HTML which we don't want in a structured-data feed.
+		$textarea_fields = array(
+			'ligase_knows_about',     // can be long CSV
+			'ligase_credentials',     // repeater
+			'ligase_member_of',       // repeater
+			'ligase_extra_sameas',    // URL per line
+		);
+		foreach ( $textarea_fields as $key ) {
+			if ( isset( $_POST[ $key ] ) ) {
+				$raw = (string) wp_unslash( $_POST[ $key ] );
+				// Normalize line endings, strip tags, keep newlines + pipes for repeaters.
+				$raw = wp_strip_all_tags( $raw );
+				$raw = preg_replace( "/\r\n|\r/", "\n", $raw );
+				update_user_meta( $user_id, $key, trim( (string) $raw ) );
+			}
+		}
+
+		// Checkbox: ligase_publish_email
+		update_user_meta(
+			$user_id,
+			'ligase_publish_email',
+			isset( $_POST['ligase_publish_email'] ) && (string) $_POST['ligase_publish_email'] === '1' ? '1' : '0'
+		);
 	}
 }

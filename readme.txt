@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.3.3
+Stable tag: 2.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,45 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.0 =
+**Person schema — major E-E-A-T upgrade. 15+ new fields, auto sameAs from WP contact methods.**
+
+The Person node generated for every post author used to be thin: name + url + jobTitle + knowsAbout + 3 hard-coded URL fields. As of 2.4.0 it builds a full professional profile worthy of citation by Google AI Overviews and LLMs.
+
+**New / expanded fields in Person schema:**
+* `givenName` + `familyName` — pulled from WP `first_name`/`last_name` (or derived from `display_name`), overridable via `ligase_given_name`/`ligase_family_name` user meta.
+* `email` — opt-in via `ligase_publish_email` checkbox (default OFF, so account emails don't leak by default).
+* `telephone` — separate from Organization's telephone.
+* `knowsLanguage` — ISO 639-1 codes, CSV format (e.g. "pl, en, de").
+* `alumniOf` — promoted from plain string to full `EducationalOrganization` with `name` + `url` + `department`.
+* `hasCredential` — repeater. One per line, pipe-separated:
+  `Name | category | Issuer name | Issuer URL | identifier? | year?`
+  Categories: `license` / `degree` / `certification` / `membership` / `award`. Emits `EducationalOccupationalCredential` nodes with `recognizedBy` Organization.
+* `memberOf` — repeater for professional bodies (Bar Association, ACM, etc.). One per line: `Name | URL`.
+* `image` override via `ligase_image_url` (replaces Gravatar fallback).
+* Legacy `ligase_credential` (single string) preserved as fallback for migrated sites.
+
+**Auto-sameAs from WP contact methods:**
+
+Ligase now auto-pulls every common social/profile URL added to user contact methods (by themes, Yoast, or `user_contactmethods` filter) and merges them into `Person.sameAs`:
+
+* `facebook`, `instagram`, `linkedin`, `youtube`, `pinterest`, `wikipedia`, `myspace`, `soundcloud`, `tumblr` (full URLs)
+* `x-username` (Yoast 21+ stores just the handle — auto-wrapped to `https://x.com/{handle}`)
+* `twitter` (legacy URL key)
+* WP `user_url` (Website)
+* Existing Ligase legacy fields (`ligase_linkedin`/`ligase_twitter`/`ligase_wikidata`) — backward compat
+* New `ligase_extra_sameas` textarea for ORCID, Google Scholar, branch catalogs etc. (one URL per line)
+
+All deduplicated by normalized host+path, validated as http/https. No more 3-URL ceiling.
+
+**Admin UI**
+
+Profile page → "Ligase — Profil autora (Person schema)" section rebuilt with 15 fields grouped into Identity / Contact / Languages & Expertise / Education / Credentials / Membership / Extra sameAs / Legacy / Image. Each field carries an inline hint with format examples (especially for the pipe-separated credential repeater).
+
+**Compatibility**
+
+Drop-in upgrade from 2.3.x. Existing `ligase_*` meta keys still read; new fields are additive. No migration required.
 
 = 2.3.3 =
 **Critical fix: schema for the wrong page on themes/plugins that call query_posts().**
