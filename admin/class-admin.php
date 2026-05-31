@@ -342,7 +342,7 @@ class Ligase_Admin {
 			'_ligase_enable_qapage', '_ligase_enable_glossary', '_ligase_enable_claimreview',
 			'_ligase_enable_software', '_ligase_enable_course', '_ligase_enable_event', '_ligase_enable_service',
 			'_ligase_enable_product', '_ligase_enable_recipe', '_ligase_enable_jobposting', '_ligase_enable_forum',
-			'_ligase_paywalled', '_ligase_force_date_modified',
+			'_ligase_paywalled', '_ligase_force_date_modified', '_ligase_enable_profile_page',
 		);
 		foreach ( $toggles as $key ) {
 			$value = isset( $_POST[ $key ] ) ? '1' : '0';
@@ -374,6 +374,84 @@ class Ligase_Admin {
 				} else {
 					update_post_meta( $post_id, $key, $value );
 				}
+			}
+		}
+
+		// _ligase_profile_user_id — explicit user reference for ProfilePage opt-in
+		if ( isset( $_POST['_ligase_profile_user_id'] ) ) {
+			$uid = absint( wp_unslash( $_POST['_ligase_profile_user_id'] ) );
+			if ( $uid > 0 ) {
+				update_post_meta( $post_id, '_ligase_profile_user_id', $uid );
+			} else {
+				delete_post_meta( $post_id, '_ligase_profile_user_id' );
+			}
+		}
+
+		// FAQ items — textarea "Q | A" per line → array of {question, answer}.
+		if ( isset( $_POST['ligase_faq_textarea'] ) ) {
+			$raw   = wp_strip_all_tags( (string) wp_unslash( $_POST['ligase_faq_textarea'] ) );
+			$items = array();
+			foreach ( preg_split( "/\r\n|\r|\n/", $raw ) ?: array() as $line ) {
+				$line = trim( $line );
+				if ( $line === '' ) {
+					continue;
+				}
+				$parts    = array_map( 'trim', explode( '|', $line, 2 ) );
+				$question = (string) ( $parts[0] ?? '' );
+				$answer   = (string) ( $parts[1] ?? '' );
+				if ( $question !== '' && $answer !== '' ) {
+					$items[] = array(
+						'question' => sanitize_text_field( $question ),
+						'answer'   => sanitize_text_field( $answer ),
+					);
+				}
+			}
+			if ( empty( $items ) ) {
+				delete_post_meta( $post_id, '_ligase_faq_items' );
+			} else {
+				update_post_meta( $post_id, '_ligase_faq_items', $items );
+			}
+		}
+
+		// HowTo — meta is array with 'name', 'totalTime', 'steps' (array of {name, text}).
+		// Form sends ligase_howto[name|totalTime] + ligase_howto_textarea (pipe-separated).
+		if ( isset( $_POST['ligase_howto'] ) || isset( $_POST['ligase_howto_textarea'] ) ) {
+			$howto_meta = array();
+			$ht         = isset( $_POST['ligase_howto'] ) && is_array( $_POST['ligase_howto'] )
+				? wp_unslash( $_POST['ligase_howto'] )
+				: array();
+			if ( ! empty( $ht['name'] ) ) {
+				$howto_meta['name'] = sanitize_text_field( (string) $ht['name'] );
+			}
+			if ( ! empty( $ht['totalTime'] ) && preg_match( '/^P(?:\d+[YMWD])*(?:T(?:\d+[HMS])*)?$/', (string) $ht['totalTime'] ) ) {
+				$howto_meta['totalTime'] = sanitize_text_field( (string) $ht['totalTime'] );
+			}
+			$steps = array();
+			$raw   = isset( $_POST['ligase_howto_textarea'] )
+				? wp_strip_all_tags( (string) wp_unslash( $_POST['ligase_howto_textarea'] ) )
+				: '';
+			foreach ( preg_split( "/\r\n|\r|\n/", $raw ) ?: array() as $line ) {
+				$line = trim( $line );
+				if ( $line === '' ) {
+					continue;
+				}
+				$parts = array_map( 'trim', explode( '|', $line, 2 ) );
+				$name  = (string) ( $parts[0] ?? '' );
+				$text  = (string) ( $parts[1] ?? '' );
+				if ( $name !== '' && $text !== '' ) {
+					$steps[] = array(
+						'name' => sanitize_text_field( $name ),
+						'text' => sanitize_text_field( $text ),
+					);
+				}
+			}
+			if ( ! empty( $steps ) ) {
+				$howto_meta['steps'] = $steps;
+			}
+			if ( empty( $howto_meta ) ) {
+				delete_post_meta( $post_id, '_ligase_howto' );
+			} else {
+				update_post_meta( $post_id, '_ligase_howto', $howto_meta );
 			}
 		}
 

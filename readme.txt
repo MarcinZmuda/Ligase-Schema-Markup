@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.1
+Stable tag: 2.4.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,17 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.2 =
+**Encoded-entities fix + Blog type for /blog/ + ProfilePage on any page + FAQ/HowTo metabox UI.**
+
+* **HTML entities in JSON-LD (regression fix).** `Ligase_Generator::build_collection_page()` and `build_profile_page()` were still passing `name` / `description` through `esc_html()` before `wp_json_encode` — same double-encoding bug the 19 type classes had in 2.0.x, now closed across the whole generator. Polish dashes, ampersands, and quotes appear as raw UTF-8 in archive JSON-LD again (not `&#8211;` / `&amp;` / `&quot;`).
+* **`Blog` @type for blog listing.** When WP renders the "Posts page" (`is_home() && ! is_front_page()`) the collection node now emits `@type: Blog` with `mainEntity → #itemlist`, not generic `CollectionPage`. Google docs explicitly support Blog for the top-level blog index page.
+* **ProfilePage opt-in on any page.** New toggle `_ligase_enable_profile_page` + dropdown `_ligase_profile_user_id` in metabox. When set, a static page (e.g. `/o-mnie/`, `/zespol/lucyna/`, `/lucyna-w-mediach/`) emits a full `Person` (from the user's profile fields, including the 15 fields added in 2.4.0) + `ProfilePage` with `mainEntity → Person`. Falls back to the page's author when no explicit user is selected. Major E-E-A-T win for sites that profile team members on dedicated pages.
+* **FAQ + HowTo metabox UI.** Two new fieldsets, both pipe-separated repeaters:
+  - **FAQ:** `Pytanie | Odpowiedź` per line. Replaces / supplements the Gutenberg FAQ block.
+  - **HowTo:** `Nazwa kroku | Opis` per line, plus standalone inputs for title + totalTime (ISO 8601). Replaces / supplements the Gutenberg HowTo block.
+  Both still respect Google's deprecation notes (HowTo rich result desktop-only since 2024, FAQ ograniczone do gov/health) but emit valid schema for AI/voice search.
 
 = 2.4.1 =
 **ItemList for archives + Service overhaul + universal metabox UI.**

@@ -41,6 +41,15 @@ class Ligase_Generator {
             case 'page':
                 $graph[] = $this->build_webpage();
                 $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
+                // ProfilePage / Person opt-in: a static page (e.g. /o-mnie/, /zespol/lucyna/,
+                // /lucyna-w-mediach/) can declare itself a Person profile by setting
+                // _ligase_enable_profile_page=1 + _ligase_profile_user_id=<user_id>.
+                // Emits Person (full E-E-A-T) + ProfilePage (mainEntity → Person).
+                $profile_uid = $this->resolve_profile_user_id( $queried );
+                if ( $profile_uid > 0 ) {
+                    $graph[] = ( new Ligase_Type_Person( $profile_uid ) )->build();
+                    $graph[] = $this->build_profile_page( $profile_uid );
+                }
                 break;
             case 'front_page_posts':
                 $graph[] = $this->build_webpage( 'CollectionPage' );
@@ -305,7 +314,7 @@ class Ligase_Generator {
         $schema = [
             '@type'           => $type,
             '@id'             => esc_url( get_permalink() ?: home_url( '/' ) ),
-            'name'            => esc_html( get_the_title() ?: get_bloginfo( 'name' ) ),
+            'name'            => wp_strip_all_tags( get_the_title() ?: get_bloginfo( 'name' ) ),
             'url'             => esc_url( get_permalink() ?: home_url( '/' ) ),
             'inLanguage'      => str_replace( '_', '-', get_locale() ),
             'isPartOf'        => [ '@id' => home_url( '/#website' ) ],
@@ -314,7 +323,7 @@ class Ligase_Generator {
 
         $excerpt = $post_id ? wp_strip_all_tags( get_the_excerpt( $post_id ) ) : '';
         if ( $excerpt ) {
-            $schema['description'] = esc_html( mb_substr( $excerpt, 0, 300 ) );
+            $schema['description'] = wp_strip_all_tags( mb_substr( $excerpt, 0, 300 ) );
         }
 
         $modified = $post_id ? get_the_modified_date( 'c', $post_id ) : '';
@@ -323,6 +332,27 @@ class Ligase_Generator {
         }
 
         return apply_filters( 'ligase_webpage', $schema, $post_id );
+    }
+
+    /**
+     * Resolve which user (if any) the current page profiles. Used by /o-mnie/,
+     * /zespol/lucyna/, /lucyna-w-mediach/ etc. Returns 0 when the page isn't a profile.
+     */
+    private function resolve_profile_user_id( $queried ): int {
+        if ( ! ( $queried instanceof WP_Post ) ) {
+            return 0;
+        }
+        $enabled = get_post_meta( $queried->ID, '_ligase_enable_profile_page', true ) === '1';
+        if ( ! $enabled ) {
+            return 0;
+        }
+        $explicit = (int) get_post_meta( $queried->ID, '_ligase_profile_user_id', true );
+        if ( $explicit > 0 && get_userdata( $explicit ) ) {
+            return $explicit;
+        }
+        // Fall back to the page's author when no explicit user is set.
+        $author_id = (int) $queried->post_author;
+        return $author_id > 0 && get_userdata( $author_id ) ? $author_id : 0;
     }
 
     /**
@@ -357,17 +387,30 @@ class Ligase_Generator {
             $desc = '';
         }
 
+        // Blog vs CollectionPage selection: blog archive (the WP "Posts page") is a
+        // Blog node with mainEntity ItemList. Taxonomy archives, author archives, etc.
+        // stay as CollectionPage. Google docs explicitly support Blog @type for the
+        // top-level blog index page since 2023.
+        $is_blog_index = function_exists( 'is_home' ) && is_home() && ! is_front_page();
+        $page_type     = $is_blog_index ? 'Blog' : 'CollectionPage';
+
         $schema = [
-            '@type'      => 'CollectionPage',
+            '@type'      => $page_type,
             '@id'        => esc_url( is_string( $url ) ? $url : home_url( '/' ) ),
-            'name'       => esc_html( $name ),
+            'name'       => wp_strip_all_tags( $name ),
             'url'        => esc_url( is_string( $url ) ? $url : home_url( '/' ) ),
             'inLanguage' => str_replace( '_', '-', get_locale() ),
             'isPartOf'   => [ '@id' => home_url( '/#website' ) ],
         ];
 
         if ( $desc ) {
-            $schema['description'] = esc_html( wp_strip_all_tags( $desc ) );
+            $schema['description'] = wp_strip_all_tags( $desc );
+        }
+
+        // For Blog index, link to ItemList of recent posts (Google uses mainEntity to
+        // understand the page is the entry point for the blog archive).
+        if ( $is_blog_index ) {
+            $schema['mainEntity'] = [ '@id' => esc_url( is_string( $url ) ? $url : home_url( '/' ) ) . '#itemlist' ];
         }
 
         return apply_filters( 'ligase_collection_page', $schema );
@@ -382,14 +425,14 @@ class Ligase_Generator {
     private function build_profile_page( int $author_id ): array {
         $user        = get_userdata( $author_id );
         $author_url  = esc_url( get_author_posts_url( $author_id ) );
-        $name        = $user ? esc_html( $user->display_name ) : '';
-        $description = $user ? esc_html( $user->description ) : '';
+        $name        = $user ? wp_strip_all_tags( $user->display_name ) : '';
+        $description = $user ? wp_strip_all_tags( $user->description ) : '';
 
         $schema = [
             '@type'       => 'ProfilePage',
             '@id'         => $author_url . '#profilepage',
             'url'         => $author_url,
-            'name'        => $name . ' — ' . esc_html( get_bloginfo( 'name' ) ),
+            'name'        => $name . ' — ' . wp_strip_all_tags( get_bloginfo( 'name' ) ),
             'inLanguage'  => str_replace( '_', '-', get_locale() ),
             'isPartOf'    => [ '@id' => home_url( '/#website' ) ],
             'about'       => [ '@id' => home_url( '/#author-' . $author_id ) ],

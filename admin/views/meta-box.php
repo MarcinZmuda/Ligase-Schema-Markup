@@ -230,6 +230,112 @@ $allowed_types = array(
 
 		<?php
 		// =====================================================================
+		// FAQ — pipe-separated Q | A per line (alternative to Gutenberg FAQ block)
+		// =====================================================================
+		$show_faq_section = get_post_meta( $post->ID, '_ligase_enable_faq', true ) === '1';
+		$faq_items        = (array) ( get_post_meta( $post->ID, '_ligase_faq_items', true ) ?: array() );
+		// Convert array of {question,answer} → textarea string "Q | A" per line.
+		$faq_textarea = '';
+		foreach ( $faq_items as $row ) {
+			if ( is_array( $row ) && ! empty( $row['question'] ) ) {
+				$faq_textarea .= $row['question'] . ' | ' . ( $row['answer'] ?? '' ) . "\n";
+			}
+		}
+		$faq_textarea = trim( $faq_textarea );
+		if ( $show_faq_section ) :
+			?>
+			<fieldset style="margin: 8px 0;">
+				<legend style="font-weight: 600; font-size: 12px; color: #444;">
+					<?php esc_html_e( 'FAQPage — pytania i odpowiedzi', 'ligase' ); ?>
+				</legend>
+				<p style="font-size:11px; color:#646970; margin:4px 0;">
+					<?php esc_html_e( 'Jedna para na linię, format: Pytanie | Odpowiedź. Minimum 2 pary by Google traktował to jako FAQ rich result.', 'ligase' ); ?>
+				</p>
+				<textarea name="ligase_faq_textarea" rows="6" style="width:100%;" placeholder="Czy można rozwieść się bez orzekania winy? | Tak, jeśli obie strony o to wniosą.
+Ile trwa rozwód? | 3-6 miesięcy w sprawach niespornych."><?php echo esc_textarea( $faq_textarea ); ?></textarea>
+			</fieldset>
+		<?php endif; ?>
+
+		<?php
+		// =====================================================================
+		// HOWTO — pipe-separated step name | step text per line
+		// =====================================================================
+		$show_howto_section = get_post_meta( $post->ID, '_ligase_enable_howto', true ) === '1';
+		$howto_data         = (array) ( get_post_meta( $post->ID, '_ligase_howto', true ) ?: array() );
+		$howto_steps        = (array) ( $howto_data['steps'] ?? array() );
+		$howto_textarea     = '';
+		foreach ( $howto_steps as $step ) {
+			if ( is_array( $step ) && ! empty( $step['name'] ) ) {
+				$howto_textarea .= $step['name'] . ' | ' . ( $step['text'] ?? '' ) . "\n";
+			}
+		}
+		$howto_textarea = trim( $howto_textarea );
+		$howto_title    = (string) ( $howto_data['name']     ?? '' );
+		$howto_time     = (string) ( $howto_data['totalTime'] ?? '' );
+		if ( $show_howto_section ) :
+			?>
+			<fieldset style="margin: 8px 0;">
+				<legend style="font-weight: 600; font-size: 12px; color: #444;">
+					<?php esc_html_e( 'HowTo — instrukcja krok po kroku', 'ligase' ); ?>
+				</legend>
+				<p style="font-size:11px; color:#646970; margin:4px 0;">
+					<?php esc_html_e( 'Google ograniczył rich result HowTo do desktop (2024), ale schema nadal pomaga voice search i AI cytowanie.', 'ligase' ); ?>
+				</p>
+				<label style="display:block; margin:6px 0;">
+					<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'Tytuł instrukcji (auto z post.title gdy puste)', 'ligase' ); ?></span>
+					<input type="text" name="ligase_howto[name]" value="<?php echo esc_attr( $howto_title ); ?>" style="width:100%;" />
+				</label>
+				<label style="display:block; margin:6px 0;">
+					<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'totalTime (ISO 8601, np. PT30M)', 'ligase' ); ?></span>
+					<input type="text" name="ligase_howto[totalTime]" value="<?php echo esc_attr( $howto_time ); ?>" placeholder="PT30M" style="width:100%;" />
+				</label>
+				<label style="display:block; margin:6px 0;">
+					<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'Kroki — jeden na linię, format: Nazwa kroku | Opis', 'ligase' ); ?></span>
+					<textarea name="ligase_howto_textarea" rows="6" style="width:100%;" placeholder="Przygotuj pozew | Spisz ustalenia ze stroną przeciwną.
+Zbierz dokumenty | Akty stanu cywilnego, dokumenty dochodowe."><?php echo esc_textarea( $howto_textarea ); ?></textarea>
+			</fieldset>
+		<?php endif; ?>
+
+		<?php
+		// =====================================================================
+		// PROFILE PAGE — Page-as-Person bio (e.g. /o-mnie/, /zespol/jan-kowalski/)
+		// =====================================================================
+		$profile_enabled = get_post_meta( $post->ID, '_ligase_enable_profile_page', true ) === '1';
+		$profile_uid     = (int) get_post_meta( $post->ID, '_ligase_profile_user_id', true );
+		if ( $post->post_type === 'page' ) :
+			?>
+			<fieldset style="margin: 8px 0;">
+				<legend style="font-weight: 600; font-size: 12px; color: #444;">
+					<?php esc_html_e( 'ProfilePage — strona zespołu / o autorze', 'ligase' ); ?>
+				</legend>
+				<label style="display:block; margin:6px 0; cursor:pointer;">
+					<input type="checkbox" name="_ligase_enable_profile_page" value="1" <?php checked( $profile_enabled, true ); ?> />
+					<?php esc_html_e( 'Ta strona to profil osoby (emituj Person + ProfilePage)', 'ligase' ); ?>
+				</label>
+				<label style="display:block; margin:6px 0;">
+					<span style="display:block; font-size:11px; color:#646970;">
+						<?php esc_html_e( 'Użytkownik WP (pole puste = autor strony)', 'ligase' ); ?>
+					</span>
+					<?php
+					$users = get_users( array( 'fields' => array( 'ID', 'display_name' ) ) );
+					?>
+					<select name="_ligase_profile_user_id" style="width:100%;">
+						<option value="0"><?php esc_html_e( '— Użyj autora strony —', 'ligase' ); ?></option>
+						<?php foreach ( $users as $u ) : ?>
+							<option value="<?php echo (int) $u->ID; ?>" <?php selected( $profile_uid, (int) $u->ID ); ?>>
+								<?php echo esc_html( $u->display_name . ' (#' . $u->ID . ')' ); ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<p style="font-size:11px; color:#646970; margin:4px 0 0;">
+					<?php esc_html_e( 'Person zbiera pola z profilu WP użytkownika (sekcja "Ligase — Profil autora"). Dla /o-mnie/, /lucyna-w-mediach/, /zespol/<imie>/ itd.', 'ligase' ); ?>
+				</p>
+			</fieldset>
+		<?php endif; ?>
+
+		<?php
+		// =====================================================================
 		// SERVICE — page-level service schema (Adwokat / Konsultant / Agency etc.)
 		// Visible when the page has Service toggle enabled.
 		// =====================================================================
