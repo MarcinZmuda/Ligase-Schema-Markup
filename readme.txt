@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.0
+Stable tag: 2.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,21 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.1 =
+**ItemList for archives + Service overhaul + universal metabox UI.**
+
+* **`Ligase_Type_ItemList`** — new schema emitted on archives so Google can build product/post carousels (host carousel for Recipe/Course/Movie/Restaurant; Beta EEA carousel for Product/Event/Hotel). Auto-detects context: WooCommerce shop home, product category/tag, regular WP taxonomy archive, blog posts listing, author archive. Each entry is a `ListItem` with `position` + inline `Product` (price/availability/image) for WooCommerce or `Article` for posts. Capped at 50 items per list. Uses the actual `WP_Query` results so what's in the schema matches what the user sees.
+* **`Ligase_Type_Service` overhaul** — supports location-targeted service pages like "Adwokat rozwód Warszawa":
+  - `provider` resolution chain: explicit `provider_id` meta (`#attorney`/`#localbusiness`/`#org`) → LocalBusiness when configured → Organization fallback. Local SEO now uses LocalBusiness `@id` not Organization (Google's local pack matches LocalBusiness).
+  - `areaServed` accepts multi-line: one location per line, optional `| Type` suffix (`City` default, `AdministrativeArea`/`State`/`Country`/`Place` available). Single → object; multiple → array. Plain strings replaced with typed nodes.
+  - `eligibleRegion` on Offer automatically inherits `areaServed`.
+  - `priceSpecification` with `minPrice`/`maxPrice` when `price_low`/`price_high` set (typical for legal/consulting services). Falls back to flat `price` when no range.
+  - `availability` enum on Offer (InStock / OnlineOnly / LimitedAvailability / OutOfStock / PreOrder).
+  - `category` for umbrella service category alongside `serviceType`.
+* **Universal metabox UI for Service / Recipe / JobPosting** — three new fieldsets under "Pola zaawansowane". No more meta-editor required to fill structured data on these types. Service section auto-shows on pages; Recipe/JobPosting auto-show when their enable toggle is on or post type matches (`job_listing`/`job`/`jobs` CPT for JobPosting).
+* **Resolver bridge for Recipe + JobPosting** — flat metabox fields (`_ligase_recipe`, `_ligase_jobposting`) now merge on top of contract resolver output, so the UI just works. Resolver still drives auto-fields (post:title, post:thumbnail) and validation gates; manual fields win where provided.
+* **Generator wiring** — ItemList added to taxonomy_archive, author_archive, blog_listing branches, plus runtime check for WooCommerce `is_shop()` / `is_product_taxonomy()`.
 
 = 2.4.0 =
 **Person schema — major E-E-A-T upgrade. 15+ new fields, auto sameAs from WP contact methods.**

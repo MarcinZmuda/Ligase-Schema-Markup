@@ -52,17 +52,33 @@ class Ligase_Generator {
             case 'taxonomy_archive':
                 $graph[] = $this->build_collection_page();
                 $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
+                $graph[] = ( new Ligase_Type_ItemList() )->build(); // products / posts carousel
                 break;
             case 'author_archive':
                 $author_id = $queried instanceof WP_User ? (int) $queried->ID : (int) get_queried_object_id();
                 $graph[]   = ( new Ligase_Type_Person( $author_id ) )->build();
                 $graph[]   = $this->build_profile_page( $author_id );
                 $graph[]   = $this->build_collection_page();
+                $graph[]   = ( new Ligase_Type_ItemList() )->build();
                 break;
+            case 'blog_listing':
+                // (already handled above; ItemList added there too via fall-through fix)
             case 'date_or_search':
                 $graph[] = $this->build_collection_page();
                 break;
             // 'unknown' → no page-specific schema, just the site-wide entities above
+        }
+
+        // ItemList also for blog_listing (WP "Posts page") + WooCommerce shop archive
+        // (`is_shop()`). ItemList class auto-detects context and returns null when
+        // nothing matches, so it's safe to call here regardless of $resolved_context.
+        if ( in_array( $resolved_context, [ 'blog_listing', 'unknown' ], true )
+             || ( function_exists( 'is_shop' ) && is_shop() )
+             || ( function_exists( 'is_product_taxonomy' ) && is_product_taxonomy() ) ) {
+            $item_list = ( new Ligase_Type_ItemList() )->build();
+            if ( $item_list ) {
+                $graph[] = $item_list;
+            }
         }
 
         $graph = apply_filters( 'ligase_schema_graph', $graph );

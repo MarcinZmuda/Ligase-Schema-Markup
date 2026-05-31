@@ -377,6 +377,106 @@ class Ligase_Admin {
 			}
 		}
 
+		// Structured per-type meta arrays. Each comes from the metabox as
+		// `ligase_<type>[field]` and is persisted as `_ligase_<type>` post meta.
+		// Whitelisting field keys per type prevents arbitrary meta injection.
+		$structured_meta = array(
+			'ligase_service'    => array(
+				'meta_key' => '_ligase_service',
+				'fields'   => array(
+					'name'           => 'text',
+					'service_type'   => 'text',
+					'category'       => 'text',
+					'description'    => 'textarea',
+					'area_served'    => 'textarea',
+					'provider_id'    => 'text',
+					'audience'       => 'text',
+					'price'          => 'text', // stored as string; float-cast at render
+					'price_low'      => 'text',
+					'price_high'     => 'text',
+					'price_currency' => 'text',
+					'availability'   => 'text',
+				),
+			),
+			'ligase_recipe'     => array(
+				'meta_key' => '_ligase_recipe',
+				'fields'   => array(
+					'name'                => 'text',
+					'description'         => 'textarea',
+					'prepTime'            => 'text',
+					'cookTime'            => 'text',
+					'totalTime'           => 'text',
+					'recipeYield'         => 'text',
+					'recipeCategory'      => 'text',
+					'recipeCuisine'       => 'text',
+					'recipeIngredient'    => 'lines',  // textarea → array of lines
+					'recipeInstructions'  => 'lines',
+					'calories'            => 'text',
+				),
+			),
+			'ligase_jobposting' => array(
+				'meta_key' => '_ligase_jobposting',
+				'fields'   => array(
+					'title'              => 'text',
+					'description'        => 'textarea',
+					'datePosted'         => 'text',
+					'validThrough'       => 'text',
+					'employmentType'     => 'text',
+					'hiringOrgName'      => 'text',
+					'hiringOrgUrl'       => 'url',
+					'jobLocationCity'    => 'text',
+					'jobLocationCountry' => 'text',
+					'jobLocationType'    => 'text',
+					'salaryMin'          => 'text',
+					'salaryMax'          => 'text',
+					'salaryCurrency'     => 'text',
+					'salaryUnit'         => 'text',
+					'directApply'        => 'text',
+				),
+			),
+		);
+
+		foreach ( $structured_meta as $post_key => $cfg ) {
+			if ( ! isset( $_POST[ $post_key ] ) || ! is_array( $_POST[ $post_key ] ) ) {
+				continue;
+			}
+			$incoming = wp_unslash( $_POST[ $post_key ] );
+			$clean    = array();
+			foreach ( $cfg['fields'] as $field => $rule ) {
+				$raw = $incoming[ $field ] ?? '';
+				if ( $raw === '' || $raw === null ) {
+					continue;
+				}
+				switch ( $rule ) {
+					case 'url':
+						$val = esc_url_raw( (string) $raw );
+						break;
+					case 'textarea':
+						$val = wp_strip_all_tags( (string) $raw );
+						$val = trim( (string) preg_replace( "/\r\n|\r/", "\n", $val ) );
+						break;
+					case 'lines':
+						$val = array_values( array_filter( array_map(
+							'trim',
+							preg_split( "/\r\n|\r|\n/", wp_strip_all_tags( (string) $raw ) ) ?: array()
+						) ) );
+						break;
+					case 'text':
+					default:
+						$val = sanitize_text_field( (string) $raw );
+				}
+				if ( $val === '' || $val === array() ) {
+					continue;
+				}
+				$clean[ $field ] = $val;
+			}
+			if ( empty( $clean ) ) {
+				delete_post_meta( $post_id, $cfg['meta_key'] );
+			} else {
+				update_post_meta( $post_id, $cfg['meta_key'], $clean );
+			}
+		}
+
 		// _ligase_citations: array of [name, url] entries posted as ligase_citations[N][name|url].
 		if ( isset( $_POST['ligase_citations'] ) && is_array( $_POST['ligase_citations'] ) ) {
 			$incoming  = wp_unslash( $_POST['ligase_citations'] );

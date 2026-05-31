@@ -36,6 +36,32 @@ class Ligase_Type_Recipe {
         $resolved = ( new Ligase_Field_Resolver() )->resolve( 'Recipe', $post_id );
         $node     = $resolved['node'];
 
+        // Merge flat meta written by the metabox UI on top of resolver output.
+        // The UI saves `ligase_recipe[field]` → `_ligase_recipe[field]`; we apply it
+        // here AFTER resolver so manual values win over post:* auto sources, but the
+        // contract (validation, sanitization) still runs on the auto path. Whitelist
+        // is mirrored from the contract field list.
+        $manual = (array) ( get_post_meta( $post_id, '_ligase_recipe', true ) ?: array() );
+        if ( ! empty( $manual ) ) {
+            $allowed = array(
+                'name', 'description', 'prepTime', 'cookTime', 'totalTime',
+                'recipeYield', 'recipeCategory', 'recipeCuisine',
+                'recipeIngredient', 'recipeInstructions',
+            );
+            foreach ( $allowed as $key ) {
+                if ( isset( $manual[ $key ] ) && $manual[ $key ] !== '' && $manual[ $key ] !== array() ) {
+                    $node[ $key ] = $manual[ $key ];
+                }
+            }
+            // calories → nutrition.calories (nested NutritionInformation)
+            if ( ! empty( $manual['calories'] ) ) {
+                $node['nutrition'] = array(
+                    '@type'    => 'NutritionInformation',
+                    'calories' => wp_strip_all_tags( (string) $manual['calories'] ),
+                );
+            }
+        }
+
         // Recipe needs name + image. Without those there's no useful rich result;
         // skip the node rather than emit half a Recipe that Search Console flags.
         if ( empty( $node['name'] ) || empty( $node['image'] ) ) {

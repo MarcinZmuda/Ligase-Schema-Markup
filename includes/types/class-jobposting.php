@@ -42,6 +42,71 @@ class Ligase_Type_JobPosting {
         $resolved = ( new Ligase_Field_Resolver() )->resolve( 'JobPosting', $post_id );
         $node     = $resolved['node'];
 
+        // Apply flat-meta UI overrides on top of resolver output (see Recipe class
+        // for the same pattern). Whitelisted keys mirror the metabox fields.
+        $manual = (array) ( get_post_meta( $post_id, '_ligase_jobposting', true ) ?: array() );
+        if ( ! empty( $manual ) ) {
+            // Top-level scalars
+            foreach ( array( 'title', 'description', 'datePosted', 'validThrough', 'employmentType', 'jobLocationType' ) as $k ) {
+                if ( ! empty( $manual[ $k ] ) ) {
+                    $node[ $k ] = is_string( $manual[ $k ] ) ? wp_strip_all_tags( $manual[ $k ] ) : $manual[ $k ];
+                }
+            }
+            // directApply → real boolean
+            if ( isset( $manual['directApply'] ) && $manual['directApply'] !== '' ) {
+                $node['directApply'] = filter_var( $manual['directApply'], FILTER_VALIDATE_BOOLEAN );
+            }
+            // hiringOrganization
+            $org = array();
+            if ( ! empty( $manual['hiringOrgName'] ) ) {
+                $org['@type'] = 'Organization';
+                $org['name']  = wp_strip_all_tags( (string) $manual['hiringOrgName'] );
+            }
+            if ( ! empty( $manual['hiringOrgUrl'] ) ) {
+                $org['@type'] = $org['@type'] ?? 'Organization';
+                $org['sameAs'] = esc_url_raw( (string) $manual['hiringOrgUrl'] );
+            }
+            if ( $org ) {
+                $node['hiringOrganization'] = $org;
+            }
+            // jobLocation
+            if ( ! empty( $manual['jobLocationCity'] ) || ! empty( $manual['jobLocationCountry'] ) ) {
+                $addr = array( '@type' => 'PostalAddress' );
+                if ( ! empty( $manual['jobLocationCity'] ) ) {
+                    $addr['addressLocality'] = wp_strip_all_tags( (string) $manual['jobLocationCity'] );
+                }
+                if ( ! empty( $manual['jobLocationCountry'] ) ) {
+                    $addr['addressCountry'] = strtoupper( substr( (string) $manual['jobLocationCountry'], 0, 2 ) );
+                }
+                $node['jobLocation'] = array(
+                    '@type'   => 'Place',
+                    'address' => $addr,
+                );
+            }
+            // baseSalary range
+            $sal_min = (string) ( $manual['salaryMin'] ?? '' );
+            $sal_max = (string) ( $manual['salaryMax'] ?? '' );
+            if ( $sal_min !== '' || $sal_max !== '' ) {
+                $currency = strtoupper( (string) ( $manual['salaryCurrency'] ?? 'PLN' ) );
+                $unit     = strtoupper( (string) ( $manual['salaryUnit'] ?? 'MONTH' ) );
+                $value    = array( '@type' => 'QuantitativeValue', 'unitText' => $unit );
+                if ( $sal_min !== '' ) {
+                    $value['minValue'] = (float) $sal_min;
+                }
+                if ( $sal_max !== '' ) {
+                    $value['maxValue'] = (float) $sal_max;
+                }
+                if ( $sal_min !== '' && $sal_max === '' ) {
+                    $value['value'] = (float) $sal_min;
+                }
+                $node['baseSalary'] = array(
+                    '@type'    => 'MonetaryAmount',
+                    'currency' => $currency,
+                    'value'    => $value,
+                );
+            }
+        }
+
         if ( empty( $node['title'] ) || empty( $node['description'] ) ) {
             return null;
         }

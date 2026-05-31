@@ -228,6 +228,173 @@ $allowed_types = array(
 			</p>
 		</fieldset>
 
+		<?php
+		// =====================================================================
+		// SERVICE — page-level service schema (Adwokat / Konsultant / Agency etc.)
+		// Visible when the page has Service toggle enabled.
+		// =====================================================================
+		$show_service_section = $post->post_type === 'page'
+			|| get_post_meta( $post->ID, '_ligase_enable_service', true ) === '1';
+		$service_meta = (array) ( get_post_meta( $post->ID, '_ligase_service', true ) ?: array() );
+		if ( $show_service_section ) :
+			?>
+			<fieldset style="margin: 8px 0;">
+				<legend style="font-weight: 600; font-size: 12px; color: #444;">
+					<?php esc_html_e( 'Service — strona usługi', 'ligase' ); ?>
+				</legend>
+				<p style="font-size:11px; color:#646970; margin:4px 0;">
+					<?php esc_html_e( 'Wymaga włączenia "Service (usluga)" w sekcji "Dodatkowe znaczniki" wyżej. Idealne dla stron typu "Adwokat rozwód Warszawa".', 'ligase' ); ?>
+				</p>
+				<?php
+				$service_fields = array(
+					'name'           => array( 'label' => __( 'Nazwa usługi (Service.name)', 'ligase' ), 'type' => 'text',
+						'placeholder' => __( 'np. Adwokat rozwód Warszawa', 'ligase' ) ),
+					'service_type'   => array( 'label' => __( 'serviceType', 'ligase' ), 'type' => 'text',
+						'placeholder' => __( 'np. Reprezentacja w sprawach rozwodowych', 'ligase' ) ),
+					'category'       => array( 'label' => __( 'category (umbrella)', 'ligase' ), 'type' => 'text',
+						'placeholder' => __( 'np. Legal Services', 'ligase' ) ),
+					'description'    => array( 'label' => __( 'description (auto z excerpt)', 'ligase' ), 'type' => 'textarea',
+						'placeholder' => __( 'Krótki opis usługi, max 500 znaków', 'ligase' ) ),
+					'area_served'    => array( 'label' => __( 'areaServed (jedna lokalizacja / linia)', 'ligase' ), 'type' => 'textarea',
+						'placeholder' => "Warszawa\nŁódź\nKraków | City\nMazowieckie | AdministrativeArea\nPolska | Country" ),
+					'provider_id'    => array( 'label' => __( 'provider @id (override)', 'ligase' ), 'type' => 'text',
+						'placeholder' => __( 'auto: #localbusiness lub #org. Możesz wymusić: #attorney', 'ligase' ) ),
+					'audience'       => array( 'label' => __( 'audience (audienceType)', 'ligase' ), 'type' => 'text',
+						'placeholder' => __( 'np. Klienci indywidualni / B2B', 'ligase' ) ),
+					'price'          => array( 'label' => __( 'Cena flat (Offer.price)', 'ligase' ), 'type' => 'number', 'step' => '0.01',
+						'placeholder' => __( 'lub użyj price_low/price_high poniżej', 'ligase' ) ),
+					'price_low'      => array( 'label' => __( 'Cena od (PriceSpecification.minPrice)', 'ligase' ), 'type' => 'number', 'step' => '0.01',
+						'placeholder' => __( 'np. 500 — zakres dla legal services', 'ligase' ) ),
+					'price_high'     => array( 'label' => __( 'Cena do (maxPrice)', 'ligase' ), 'type' => 'number', 'step' => '0.01',
+						'placeholder' => __( 'np. 5000', 'ligase' ) ),
+					'price_currency' => array( 'label' => __( 'Waluta', 'ligase' ), 'type' => 'text',
+						'placeholder' => __( 'PLN / EUR / USD', 'ligase' ) ),
+					'availability'   => array( 'label' => __( 'Offer.availability', 'ligase' ), 'type' => 'text',
+						'placeholder' => __( 'InStock / OutOfStock / OnlineOnly / LimitedAvailability', 'ligase' ) ),
+				);
+				foreach ( $service_fields as $key => $cfg ) :
+					$val = (string) ( $service_meta[ $key ] ?? '' );
+					?>
+					<label style="display:block; margin:6px 0;">
+						<span style="display:block; font-size:11px; color:#646970;">
+							<?php echo esc_html( $cfg['label'] ); ?>
+						</span>
+						<?php if ( $cfg['type'] === 'textarea' ) : ?>
+							<textarea name="ligase_service[<?php echo esc_attr( $key ); ?>]" rows="3" style="width:100%;" placeholder="<?php echo esc_attr( $cfg['placeholder'] ); ?>"><?php echo esc_textarea( $val ); ?></textarea>
+						<?php else : ?>
+							<input type="<?php echo esc_attr( $cfg['type'] ); ?>"
+								name="ligase_service[<?php echo esc_attr( $key ); ?>]"
+								value="<?php echo esc_attr( $val ); ?>"
+								<?php if ( isset( $cfg['step'] ) ) : ?>step="<?php echo esc_attr( $cfg['step'] ); ?>"<?php endif; ?>
+								placeholder="<?php echo esc_attr( $cfg['placeholder'] ); ?>"
+								style="width:100%;" />
+						<?php endif; ?>
+					</label>
+				<?php endforeach; ?>
+			</fieldset>
+		<?php endif; ?>
+
+		<?php
+		// =====================================================================
+		// RECIPE
+		// =====================================================================
+		$show_recipe_section = get_post_meta( $post->ID, '_ligase_enable_recipe', true ) === '1';
+		$recipe_meta = (array) ( get_post_meta( $post->ID, '_ligase_recipe', true ) ?: array() );
+		if ( $show_recipe_section ) :
+			?>
+			<fieldset style="margin: 8px 0;">
+				<legend style="font-weight: 600; font-size: 12px; color: #444;">
+					<?php esc_html_e( 'Recipe — przepis kulinarny', 'ligase' ); ?>
+				</legend>
+				<?php
+				$recipe_fields = array(
+					'name'                => array( 'label' => __( 'Nazwa przepisu (auto z tytułu)', 'ligase' ), 'type' => 'text' ),
+					'description'         => array( 'label' => __( 'Opis (auto z excerpt)', 'ligase' ), 'type' => 'textarea' ),
+					'prepTime'            => array( 'label' => __( 'Czas przygotowania (ISO 8601, np. PT15M)', 'ligase' ), 'type' => 'text', 'placeholder' => 'PT15M' ),
+					'cookTime'            => array( 'label' => __( 'Czas gotowania (ISO 8601)', 'ligase' ), 'type' => 'text', 'placeholder' => 'PT30M' ),
+					'totalTime'           => array( 'label' => __( 'Czas łączny', 'ligase' ), 'type' => 'text', 'placeholder' => 'PT45M' ),
+					'recipeYield'         => array( 'label' => __( 'Liczba porcji', 'ligase' ), 'type' => 'text', 'placeholder' => '4 porcje' ),
+					'recipeCategory'      => array( 'label' => __( 'Kategoria (śniadanie/obiad/deser)', 'ligase' ), 'type' => 'text' ),
+					'recipeCuisine'       => array( 'label' => __( 'Kuchnia (polska/włoska...)', 'ligase' ), 'type' => 'text' ),
+					'recipeIngredient'    => array( 'label' => __( 'Składniki (jeden na linię)', 'ligase' ), 'type' => 'textarea' ),
+					'recipeInstructions'  => array( 'label' => __( 'Instrukcje (jeden krok na linię)', 'ligase' ), 'type' => 'textarea' ),
+					'calories'            => array( 'label' => __( 'Kalorie (np. 350 kcal)', 'ligase' ), 'type' => 'text' ),
+				);
+				foreach ( $recipe_fields as $key => $cfg ) :
+					$val = (string) ( $recipe_meta[ $key ] ?? '' );
+					if ( is_array( $recipe_meta[ $key ] ?? null ) ) {
+						$val = implode( "\n", (array) $recipe_meta[ $key ] );
+					}
+					?>
+					<label style="display:block; margin:6px 0;">
+						<span style="display:block; font-size:11px; color:#646970;"><?php echo esc_html( $cfg['label'] ); ?></span>
+						<?php if ( $cfg['type'] === 'textarea' ) : ?>
+							<textarea name="ligase_recipe[<?php echo esc_attr( $key ); ?>]" rows="3" style="width:100%;"
+								<?php if ( ! empty( $cfg['placeholder'] ) ) : ?>placeholder="<?php echo esc_attr( $cfg['placeholder'] ); ?>"<?php endif; ?>><?php echo esc_textarea( $val ); ?></textarea>
+						<?php else : ?>
+							<input type="<?php echo esc_attr( $cfg['type'] ); ?>"
+								name="ligase_recipe[<?php echo esc_attr( $key ); ?>]"
+								value="<?php echo esc_attr( $val ); ?>"
+								<?php if ( ! empty( $cfg['placeholder'] ) ) : ?>placeholder="<?php echo esc_attr( $cfg['placeholder'] ); ?>"<?php endif; ?>
+								style="width:100%;" />
+						<?php endif; ?>
+					</label>
+				<?php endforeach; ?>
+			</fieldset>
+		<?php endif; ?>
+
+		<?php
+		// =====================================================================
+		// JOB POSTING
+		// =====================================================================
+		$show_job_section = get_post_meta( $post->ID, '_ligase_enable_jobposting', true ) === '1'
+			|| in_array( $post->post_type, array( 'job_listing', 'job', 'jobs' ), true );
+		$job_meta = (array) ( get_post_meta( $post->ID, '_ligase_jobposting', true ) ?: array() );
+		if ( $show_job_section ) :
+			?>
+			<fieldset style="margin: 8px 0;">
+				<legend style="font-weight: 600; font-size: 12px; color: #444;">
+					<?php esc_html_e( 'JobPosting — oferta pracy (Google Jobs)', 'ligase' ); ?>
+				</legend>
+				<?php
+				$job_fields = array(
+					'title'              => array( 'label' => __( 'Tytuł stanowiska (auto z post.title)', 'ligase' ), 'type' => 'text' ),
+					'description'        => array( 'label' => __( 'Opis stanowiska (HTML, auto z post.content)', 'ligase' ), 'type' => 'textarea' ),
+					'datePosted'         => array( 'label' => __( 'Data publikacji (YYYY-MM-DD)', 'ligase' ), 'type' => 'date' ),
+					'validThrough'       => array( 'label' => __( 'Ważne do (YYYY-MM-DD) — wymagane', 'ligase' ), 'type' => 'date' ),
+					'employmentType'     => array( 'label' => __( 'employmentType', 'ligase' ), 'type' => 'text',
+						'placeholder' => 'FULL_TIME / PART_TIME / CONTRACTOR / TEMPORARY / INTERN' ),
+					'hiringOrgName'      => array( 'label' => __( 'Pracodawca — nazwa', 'ligase' ), 'type' => 'text' ),
+					'hiringOrgUrl'       => array( 'label' => __( 'Pracodawca — URL', 'ligase' ), 'type' => 'url' ),
+					'jobLocationCity'    => array( 'label' => __( 'Miasto (jobLocation.address.addressLocality)', 'ligase' ), 'type' => 'text' ),
+					'jobLocationCountry' => array( 'label' => __( 'Kraj (ISO 3166-1)', 'ligase' ), 'type' => 'text', 'placeholder' => 'PL' ),
+					'jobLocationType'    => array( 'label' => __( 'jobLocationType (zostaw puste dla stacjonarnej; "TELECOMMUTE" dla zdalnej)', 'ligase' ), 'type' => 'text' ),
+					'salaryMin'          => array( 'label' => __( 'Wynagrodzenie od', 'ligase' ), 'type' => 'number', 'step' => '0.01' ),
+					'salaryMax'          => array( 'label' => __( 'Wynagrodzenie do', 'ligase' ), 'type' => 'number', 'step' => '0.01' ),
+					'salaryCurrency'     => array( 'label' => __( 'Waluta', 'ligase' ), 'type' => 'text', 'placeholder' => 'PLN' ),
+					'salaryUnit'         => array( 'label' => __( 'Jednostka', 'ligase' ), 'type' => 'text', 'placeholder' => 'HOUR / DAY / WEEK / MONTH / YEAR' ),
+					'directApply'        => array( 'label' => __( 'directApply (1 = aplikacja na tej stronie)', 'ligase' ), 'type' => 'text', 'placeholder' => '0 lub 1' ),
+				);
+				foreach ( $job_fields as $key => $cfg ) :
+					$val = (string) ( $job_meta[ $key ] ?? '' );
+					?>
+					<label style="display:block; margin:6px 0;">
+						<span style="display:block; font-size:11px; color:#646970;"><?php echo esc_html( $cfg['label'] ); ?></span>
+						<?php if ( $cfg['type'] === 'textarea' ) : ?>
+							<textarea name="ligase_jobposting[<?php echo esc_attr( $key ); ?>]" rows="3" style="width:100%;"><?php echo esc_textarea( $val ); ?></textarea>
+						<?php else : ?>
+							<input type="<?php echo esc_attr( $cfg['type'] ); ?>"
+								name="ligase_jobposting[<?php echo esc_attr( $key ); ?>]"
+								value="<?php echo esc_attr( $val ); ?>"
+								<?php if ( isset( $cfg['step'] ) ) : ?>step="<?php echo esc_attr( $cfg['step'] ); ?>"<?php endif; ?>
+								<?php if ( ! empty( $cfg['placeholder'] ) ) : ?>placeholder="<?php echo esc_attr( $cfg['placeholder'] ); ?>"<?php endif; ?>
+								style="width:100%;" />
+						<?php endif; ?>
+					</label>
+				<?php endforeach; ?>
+			</fieldset>
+		<?php endif; ?>
+
 		<?php if ( $show_product_section ) : ?>
 			<fieldset style="margin: 8px 0;">
 				<legend style="font-weight: 600; font-size: 12px; color: #444;">
