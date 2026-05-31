@@ -22,13 +22,18 @@ $options  = get_option( 'ligase_options', array() );
 <!-- Plugin Conflicts -->
 <div class="ligase-card ligase-card-wide">
 	<h2><?php esc_html_e( 'Wykryte wtyczki SEO', 'ligase' ); ?></h2>
+	<?php
+	$_lig_opts        = (array) get_option( 'ligase_options', array() );
+	$_lig_standalone  = ! empty( $_lig_opts['standalone_mode'] );
+	$_lig_force       = ! empty( $_lig_opts['force_output'] );
+	?>
 	<?php if ( ! empty( $detected ) ) : ?>
 		<table class="widefat fixed striped">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Wtyczka', 'ligase' ); ?></th>
 					<th style="width:120px;"><?php esc_html_e( 'Wersja', 'ligase' ); ?></th>
-					<th style="width:120px;"><?php esc_html_e( 'Status', 'ligase' ); ?></th>
+					<th style="width:200px;"><?php esc_html_e( 'Status', 'ligase' ); ?></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -37,18 +42,41 @@ $options  = get_option( 'ligase_options', array() );
 						<td><?php echo esc_html( $name ); ?></td>
 						<td><?php echo esc_html( $version ); ?></td>
 						<td>
-							<span class="ligase-badge ligase-badge-warn"><?php esc_html_e( 'Aktywna', 'ligase' ); ?></span>
+							<?php if ( $_lig_force ) : ?>
+								<span class="ligase-badge" style="background:#fef3c7;color:#78350f;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;">⚠ FORCE — duplikat ryzyko</span>
+							<?php elseif ( $_lig_standalone ) : ?>
+								<span class="ligase-badge" style="background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:600;">✓ Wyciszone</span>
+							<?php else : ?>
+								<span class="ligase-badge ligase-badge-warn">⚠ <?php esc_html_e( 'Aktywna', 'ligase' ); ?></span>
+							<?php endif; ?>
 						</td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
 		</table>
-		<p class="description">
-			<?php esc_html_e( 'Te wtyczki moga generowac wlasna schema. Wlacz tryb standalone w ustawieniach, aby Ligase zastepowala ich schema.', 'ligase' ); ?>
-		</p>
+		<?php if ( $_lig_force ) : ?>
+			<p class="description" style="background:#fef3c7;padding:8px 12px;border-left:3px solid #f59e0b;margin-top:8px;">
+				<strong>⚠ <?php esc_html_e( 'Tryb FORCE OUTPUT aktywny.', 'ligase' ); ?></strong>
+				<?php esc_html_e( 'Ligase emituje swoje JSON-LD niezależnie od wykrytych wtyczek SEO. Może to powodować DUPLIKATY schema (Ligase + Yoast = 2× Article). Sprawdź źródło strony — jeśli widzisz dwa <script type="application/ld+json">, wyłącz force i włącz standalone, albo wyłącz schema w konkurencyjnej wtyczce.', 'ligase' ); ?>
+			</p>
+		<?php elseif ( $_lig_standalone ) : ?>
+			<p class="description" style="background:#d1fae5;padding:8px 12px;border-left:3px solid #10b981;margin-top:8px;">
+				<strong>✓ <?php esc_html_e( 'Tryb Standalone aktywny.', 'ligase' ); ?></strong>
+				<?php esc_html_e( 'Ligase próbuje wyciszać schema wymienionych wtyczek przez znane filtry. Sprawdź wynik na produkcie / wpisie — w źródle strony powinien być tylko JSON-LD Ligase. Jeśli widzisz duplikat (np. Yoast nadal emituje breadcrumbs), wyłącz odpowiednie schemy w ustawieniach tamtej wtyczki — niektóre wersje (np. Yoast 27.x) emitują przez nowe filtry których Ligase jeszcze nie zna.', 'ligase' ); ?>
+			</p>
+		<?php else : ?>
+			<p class="description">
+				<?php esc_html_e( 'Te wtyczki mogą generować własną schema. Ligase domyślnie się wycofuje (żeby nie tworzyć duplikatów). Włącz tryb standalone w ustawieniach jeśli chcesz żeby Ligase zastępowała ich schema.', 'ligase' ); ?>
+			</p>
+			<p style="margin-top:6px;">
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=ligase-ustawienia' ) ); ?>" class="button button-primary button-small">
+					<?php esc_html_e( 'Przejdź do ustawień → włącz Standalone', 'ligase' ); ?>
+				</a>
+			</p>
+		<?php endif; ?>
 	<?php else : ?>
 		<p class="ligase-notice ligase-notice-success">
-			<?php esc_html_e( 'Nie wykryto zadnych konfliktujacych wtyczek SEO.', 'ligase' ); ?>
+			<?php esc_html_e( 'Nie wykryto żadnych konfliktujących wtyczek SEO.', 'ligase' ); ?>
 		</p>
 	<?php endif; ?>
 </div>

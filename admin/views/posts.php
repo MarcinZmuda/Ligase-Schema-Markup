@@ -15,14 +15,48 @@ if ( ! defined( 'ABSPATH' ) ) {
 $paged    = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 $per_page = 20;
 
-$query = new WP_Query( array(
-	'post_type'      => 'post',
+// Post-type filter — defaults to `post` for back-compat but accepts any
+// public CPT so users can browse pages/products/CPT and bulk-apply flags
+// on what they actually see. Sanitized via post_type whitelist.
+$available_post_types = get_post_types( array( 'public' => true ), 'objects' );
+unset( $available_post_types['attachment'] );
+$ligase_pt_filter = isset( $_GET['ligase_pt'] ) ? sanitize_key( wp_unslash( $_GET['ligase_pt'] ) ) : 'post'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+if ( ! array_key_exists( $ligase_pt_filter, $available_post_types ) ) {
+	$ligase_pt_filter = 'post';
+}
+
+// Optional flag-presence filter — list only posts where a specific schema
+// toggle is enabled. Useful for "show me all pages with Service enabled".
+$ligase_flag_filter = isset( $_GET['ligase_flag'] ) ? sanitize_key( wp_unslash( $_GET['ligase_flag'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+$allowed_flags_keys = array(
+	'_ligase_enable_service', '_ligase_enable_faq', '_ligase_enable_howto',
+	'_ligase_enable_review', '_ligase_enable_qapage', '_ligase_enable_product',
+	'_ligase_enable_recipe', '_ligase_enable_jobposting', '_ligase_enable_forum',
+	'_ligase_enable_course', '_ligase_enable_event', '_ligase_enable_software',
+	'_ligase_enable_glossary', '_ligase_enable_claimreview',
+	'_ligase_enable_profile_page', '_ligase_paywalled',
+);
+if ( $ligase_flag_filter !== '' && ! in_array( $ligase_flag_filter, $allowed_flags_keys, true ) ) {
+	$ligase_flag_filter = '';
+}
+
+$query_args = array(
+	'post_type'      => $ligase_pt_filter,
 	'post_status'    => 'publish',
 	'posts_per_page' => $per_page,
 	'paged'          => $paged,
 	'orderby'        => 'date',
 	'order'          => 'DESC',
-) );
+);
+if ( $ligase_flag_filter !== '' ) {
+	$query_args['meta_query'] = array(
+		array(
+			'key'   => $ligase_flag_filter,
+			'value' => '1',
+		),
+	);
+}
+$query = new WP_Query( $query_args );
 
 $total_posts = $query->found_posts;
 $total_pages = $query->max_num_pages;
@@ -31,6 +65,66 @@ $score_calculator = new Ligase_Score();
 ?>
 
 <h1><?php esc_html_e( 'Ligase — Posty', 'ligase' ); ?></h1>
+
+<!-- Post-type + flag filter -->
+<form method="get" style="margin: 0 0 12px; padding: 10px 14px; background: #fff; border: 1px solid #ddd; border-radius: 4px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+	<input type="hidden" name="page" value="ligase-posty" />
+	<label style="font-size: 13px;">
+		<strong><?php esc_html_e( 'Pokaż', 'ligase' ); ?>:</strong>
+		<select name="ligase_pt" onchange="this.form.submit()" style="margin-left: 6px;">
+			<?php foreach ( $available_post_types as $slug => $pt_obj ) : ?>
+				<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $slug, $ligase_pt_filter ); ?>>
+					<?php echo esc_html( $pt_obj->labels->name . ' (' . $slug . ')' ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+	</label>
+	<label style="font-size: 13px;">
+		<strong><?php esc_html_e( 'Tylko z włączonym', 'ligase' ); ?>:</strong>
+		<select name="ligase_flag" onchange="this.form.submit()" style="margin-left: 6px;">
+			<option value=""><?php esc_html_e( '— wszystkie —', 'ligase' ); ?></option>
+			<?php
+			$flag_labels = array(
+				'_ligase_enable_service'      => 'Service',
+				'_ligase_enable_faq'          => 'FAQPage',
+				'_ligase_enable_howto'        => 'HowTo',
+				'_ligase_enable_review'       => 'Review',
+				'_ligase_enable_qapage'       => 'QAPage',
+				'_ligase_enable_product'      => 'Product',
+				'_ligase_enable_recipe'       => 'Recipe',
+				'_ligase_enable_jobposting'   => 'JobPosting',
+				'_ligase_enable_forum'        => 'DiscussionForumPosting',
+				'_ligase_enable_course'       => 'Course',
+				'_ligase_enable_event'        => 'Event',
+				'_ligase_enable_software'     => 'SoftwareApplication',
+				'_ligase_enable_glossary'     => 'DefinedTerm',
+				'_ligase_enable_claimreview'  => 'ClaimReview',
+				'_ligase_enable_profile_page' => 'ProfilePage',
+				'_ligase_paywalled'           => 'Paywall',
+			);
+			foreach ( $flag_labels as $key => $label ) : ?>
+				<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $key, $ligase_flag_filter ); ?>>
+					<?php echo esc_html( $label ); ?>
+				</option>
+			<?php endforeach; ?>
+		</select>
+	</label>
+	<?php if ( $ligase_pt_filter !== 'post' || $ligase_flag_filter !== '' ) : ?>
+		<a href="<?php echo esc_url( admin_url( 'admin.php?page=ligase-posty' ) ); ?>" class="button button-small">
+			<?php esc_html_e( 'Wyczyść filtry', 'ligase' ); ?>
+		</a>
+	<?php endif; ?>
+	<span style="margin-left: auto; font-size: 12px; color: #666;">
+		<?php
+		printf(
+			/* translators: %1$d count, %2$s post type label */
+			esc_html__( '%1$d × %2$s', 'ligase' ),
+			(int) $total_posts,
+			esc_html( $available_post_types[ $ligase_pt_filter ]->labels->name )
+		);
+		?>
+	</span>
+</form>
 
 <?php
 $opts_toolbar = (array) get_option( 'ligase_options', array() );
@@ -109,8 +203,10 @@ $allowed_schema_types = array( 'BlogPosting', 'Article', 'NewsArticle', 'TechArt
 					$bulk_post_types   = get_post_types( $post_types_args, 'objects' );
 					foreach ( $bulk_post_types as $slug => $pt_obj ) :
 						if ( $slug === 'attachment' ) { continue; }
+						// Pre-select whatever the table is filtered to, so "Zastosuj"
+						// hits the same population the user is looking at.
 						?>
-						<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $slug, 'post' ); ?>>
+						<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $slug, $ligase_pt_filter ); ?>>
 							<?php echo esc_html( $pt_obj->labels->name . ' (' . $slug . ')' ); ?>
 						</option>
 					<?php endforeach; ?>
@@ -199,12 +295,32 @@ $allowed_schema_types = array( 'BlogPosting', 'Article', 'NewsArticle', 'TechArt
 			<th><?php esc_html_e( 'Tytul', 'ligase' ); ?></th>
 			<th style="width:100px;"><?php esc_html_e( 'Schema Score', 'ligase' ); ?></th>
 			<th style="width:120px;"><?php esc_html_e( 'Typ schema', 'ligase' ); ?></th>
+			<th><?php esc_html_e( 'Znaczniki', 'ligase' ); ?></th>
 			<th style="width:100px;"><?php esc_html_e( 'Data', 'ligase' ); ?></th>
 			<th style="width:200px;"><?php esc_html_e( 'Akcje', 'ligase' ); ?></th>
 		</tr>
 	</thead>
 	<tbody>
-		<?php if ( $query->have_posts() ) : ?>
+		<?php
+		$flag_short_labels = array(
+			'_ligase_enable_service'      => 'Service',
+			'_ligase_enable_faq'          => 'FAQ',
+			'_ligase_enable_howto'        => 'HowTo',
+			'_ligase_enable_review'       => 'Review',
+			'_ligase_enable_qapage'       => 'QA',
+			'_ligase_enable_product'      => 'Product',
+			'_ligase_enable_recipe'       => 'Recipe',
+			'_ligase_enable_jobposting'   => 'Job',
+			'_ligase_enable_forum'        => 'Forum',
+			'_ligase_enable_course'       => 'Course',
+			'_ligase_enable_event'        => 'Event',
+			'_ligase_enable_software'     => 'Software',
+			'_ligase_enable_glossary'     => 'Glossary',
+			'_ligase_enable_claimreview'  => 'Claim',
+			'_ligase_enable_profile_page' => 'Profile',
+			'_ligase_paywalled'           => 'Paywall',
+		);
+		if ( $query->have_posts() ) : ?>
 			<?php while ( $query->have_posts() ) : $query->the_post(); ?>
 				<?php
 				$post_id     = get_the_ID();
@@ -212,6 +328,14 @@ $allowed_schema_types = array( 'BlogPosting', 'Article', 'NewsArticle', 'TechArt
 				$score_val   = $post_score['score'];
 				$opts_global  = (array) get_option( 'ligase_options', array() );
 				$schema_type = get_post_meta( $post_id, '_ligase_schema_type', true ) ?: ( $opts_global['default_schema_type'] ?? 'BlogPosting' );
+
+				// Collect enabled flags for the badge column.
+				$enabled_flags = array();
+				foreach ( $flag_short_labels as $meta_key => $short ) {
+					if ( get_post_meta( $post_id, $meta_key, true ) === '1' ) {
+						$enabled_flags[] = $short;
+					}
+				}
 
 				if ( $score_val >= 70 ) {
 					$score_class = 'ligase-score-good';
@@ -235,6 +359,17 @@ $allowed_schema_types = array( 'BlogPosting', 'Article', 'NewsArticle', 'TechArt
 						</span>
 					</td>
 					<td><code><?php echo esc_html( $schema_type ); ?></code></td>
+					<td>
+						<?php if ( empty( $enabled_flags ) ) : ?>
+							<span style="color:#aaa;font-size:11px;">—</span>
+						<?php else : ?>
+							<?php foreach ( $enabled_flags as $flag ) : ?>
+								<span style="display:inline-block;padding:1px 6px;margin:1px 2px 1px 0;background:#e0f2fe;color:#075985;border-radius:10px;font-size:10px;font-weight:600;">
+									<?php echo esc_html( $flag ); ?>
+								</span>
+							<?php endforeach; ?>
+						<?php endif; ?>
+					</td>
 					<td><?php echo esc_html( get_the_date( 'Y-m-d' ) ); ?></td>
 					<td>
 						<button type="button" class="button button-small ligase-btn-scan" data-post-id="<?php echo esc_attr( $post_id ); ?>">
@@ -252,7 +387,7 @@ $allowed_schema_types = array( 'BlogPosting', 'Article', 'NewsArticle', 'TechArt
 			<?php wp_reset_postdata(); ?>
 		<?php else : ?>
 			<tr>
-				<td colspan="7"><?php esc_html_e( 'Brak opublikowanych postow.', 'ligase' ); ?></td>
+				<td colspan="8"><?php esc_html_e( 'Brak opublikowanych postow.', 'ligase' ); ?></td>
 			</tr>
 		<?php endif; ?>
 	</tbody>

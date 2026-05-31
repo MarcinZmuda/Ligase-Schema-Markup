@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.4
+Stable tag: 2.4.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,17 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.5 =
+**Posty page: filter post_type/flag + flags column + auditor "Standalone aktywny" status fix + 2.4.4 auditor type-aware.**
+
+* **Filtry w Ligase → Posty:** dropdown "Pokaż" wybiera typ wpisu (post / page / product / każdy publiczny CPT) + opcjonalny dropdown "Tylko z włączonym" filtruje listę po jednej z 16 flag schema. URL ma teraz `?ligase_pt=page&ligase_flag=_ligase_enable_service` żeby zapamiętać widok między akcjami.
+* **Kolumna "Znaczniki"** w tabeli pokazuje na każdym wierszu wszystkie aktywne flagi schema jako badge'e (Service / FAQ / Recipe / Product / itd.). Widać od razu które strony co już mają.
+* **Bulk panel auto-syncuje z filtrem** — gdy wybierzesz "page" w głównym filtrze, dropdown bulk panela też skacze na "page". Już nie zastosujesz akcji do złej populacji przez przypadek.
+* **Audytor schema → "Wykryte wtyczki SEO" status fix.** Wcześniej zawsze pokazywał "⚠ Aktywna — włącz tryb standalone" nawet gdy Standalone Mode był włączony. Teraz:
+  - **Standalone Mode ON** → zielony badge "✓ Wyciszone" + zielony banner z hintem "Sprawdź źródło — jeśli widzisz duplikat, niektóre wersje (Yoast 27.x) emitują przez nowe filtry których Ligase jeszcze nie zna; wyłącz schema w tamtej wtyczce ręcznie".
+  - **Force Output ON** → żółty badge "⚠ FORCE — duplikat ryzyko" + ostrzeżenie o duplikacie.
+  - **Default mode** → ostrzeżenie + przycisk "Przejdź do ustawień → włącz Standalone".
 
 = 2.4.4 =
 **Auditor false-positive fix + Polish messages.**
