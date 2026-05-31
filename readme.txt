@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.3
+Stable tag: 2.4.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,31 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.4 =
+**Auditor false-positive fix + Polish messages.**
+
+`Ligase_Auditor::collect_issues()` was emitting Article-only checks for EVERY schema node it found — so Product/Service/Person/LocalBusiness/Event/Recipe nodes always carried 9 fake "Missing headline / datePublished / author / publisher" warnings even when those fields are not part of those types' specifications.
+
+* **Type-aware issue rubrics.** Each @type now has its own rubric matching Google's actual requirements for that type:
+  - Article-family → existing 9 checks (headline, dates, author, image, publisher, @id)
+  - Product → name + image + offer required + identifier (sku/gtin/mpn/brand) + merchant return policy
+  - Service → name + provider + serviceType + areaServed
+  - Person → name + @id + image + sameAs
+  - Organization / OnlineStore → name + url + logo + sameAs
+  - LocalBusiness / Attorney / LegalService / Restaurant / Store / Hotel → name + address + telephone + openingHours + geo
+  - Event → name + startDate (ISO 8601) + location-or-online + organizer
+  - Recipe → name + image + recipeIngredient + recipeInstructions
+  - JobPosting → 5 required + location/locationType
+  - FAQPage → ≥2 questions
+  - HowTo → name + image + ≥2 steps
+  - VideoObject → name + thumbnailUrl + uploadDate + content/embedUrl
+  - WebSite / WebPage / Blog / CollectionPage / ProfilePage → basic name + url
+  - BreadcrumbList / ItemList → ≥1 item
+  - SiteNavigationElement → no checks (always silent)
+  - Unknown type → minimal generic check (name OR headline)
+* **All messages translated to Polish** to match the rest of the admin UI (was English).
+* **Sample false-positive eliminated:** a valid Product node with name+price+offer no longer triggers "Missing headline" / "Missing datePublished" / "Missing publisher" / "Missing author".
 
 = 2.4.3 =
 **Removed broken "Narzędzia" submenu + bulk schema flags panel.**
