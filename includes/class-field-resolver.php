@@ -362,6 +362,12 @@ final class Ligase_Field_Resolver {
 		if ( $what === 'unit_code_day' ) {
 			return 'DAY';
 		}
+		// refundType default — FullRefund (money back) matches Polish consumer law
+		// (UPK 14 days right of withdrawal = full refund). Sites that only exchange
+		// goods or issue store credit should override per-product or via filter.
+		if ( $what === 'refund_type_default' ) {
+			return 'https://schema.org/FullRefund';
+		}
 		return null;
 	}
 

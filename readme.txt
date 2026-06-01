@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.12
+Stable tag: 2.4.13
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,30 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.13 =
+**Organization-level MerchantReturnPolicy: refundType + returnShippingFeesAmount + output-buffer BreadcrumbList dedupe.**
+
+**BreadcrumbList duplikat (XStore / Flatsome / Woodmart / Avada).** Filter'y suppressora dla Yoast 27.x z 2.4.10 nie obejmują BreadcrumbList wstrzykiwanego inline przez WooCommerce theme'y — emitują własny `<script type="application/ld+json">{"@type":"BreadcrumbList",...}</script>` bezpośrednio z template parts, bez żadnego filter hook'a do przechwycenia.
+
+Naprawione: output-buffer scrubber w `Ligase_Suppressor::register_breadcrumb_scrubber()`. Aktywne tylko gdy `standalone_mode` ON. Otwiera `ob_start` na `template_redirect`, przy flush'u:
+* Trzyma Ligase'owy BreadcrumbList (identifikowany po `@id` zakończonym `#breadcrumb`)
+* Trzyma wszystkie `@graph` bloki nietknięte (Ligase'owy główny payload)
+* **Wycina** każdy inny standalone BreadcrumbList script
+
+Defensive: parsuje JSON, jeśli się nie da → zostawia, nie modyfikuje admin / REST / AJAX / feeds.
+
+Rich Results Test → "Zasady zwrotów" na stronie głównej flag'ował dla `#return-policy` na Organization/OnlineStore:
+* Brakujące pole `refundType`
+* Brakujące pole `returnShippingFeesAmount`
+
+Te właściwości naprawiłem wcześniej w Field_Contract (dla Product Offer), ale Organization-level policy w `build_store_return_policy()` ma osobną logikę i tych fix'ów nie dostała.
+
+Dodane:
+* `refundType` → `https://schema.org/FullRefund` (zgodne z UPK PL — prawo do zwrotu pieniędzy 14 dni)
+* `returnShippingFeesAmount` (MonetaryAmount) — emituje się tylko gdy `store_return_fees=ReturnShippingFees`, pulled z `store_shipping_rate` + `store_currency`
+* Whitelist `store_return_fees` (gdy ktoś ręcznie wpisze bzdurną wartość → fallback do `FreeReturn`)
+* Plus `refundType` dla Product Offer w Field_Contract (derive helper)
 
 = 2.4.12 =
 **Organization: `image` + `address` (PostalAddress) — Google "Firmy lokalne" flags.**

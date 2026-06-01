@@ -149,7 +149,12 @@ class Ligase_Type_Organization {
         }
         $days = isset( $opts['store_return_days'] ) ? max( 0, (int) $opts['store_return_days'] ) : 14;
         $fees = wp_strip_all_tags( (string) ( $opts['store_return_fees'] ?? 'FreeReturn' ) );
-        return [
+        $allowed_fees = array( 'FreeReturn', 'ReturnFeesCustomerResponsibility', 'ReturnShippingFees', 'RestockingFees' );
+        if ( ! in_array( $fees, $allowed_fees, true ) ) {
+            $fees = 'FreeReturn';
+        }
+
+        $policy = [
             '@type'                => 'MerchantReturnPolicy',
             '@id'                  => home_url( '/#return-policy' ),
             'applicableCountry'    => $country,
@@ -158,7 +163,30 @@ class Ligase_Type_Organization {
             'merchantReturnDays'   => $days,
             'returnMethod'         => 'https://schema.org/ReturnByMail',
             'returnFees'           => 'https://schema.org/' . $fees,
+            // refundType — schema.org enum. Polish e-commerce defaults to FullRefund
+            // (zwrot pieniędzy); sklepy oferujące tylko wymianę towaru lub voucher
+            // mogą nadpisać przez filter `ligase_organization`. Without this field,
+            // Google's "Zasady zwrotów" check flags "Brakujące pole refundType".
+            'refundType'           => 'https://schema.org/FullRefund',
         ];
+
+        // returnShippingFeesAmount — schema.org wants the actual cost the customer
+        // pays for return shipping when fees=ReturnShippingFees. Pull from the same
+        // store_shipping_rate the OfferShippingDetails uses for consistency; if the
+        // store hasn't set a shipping rate yet, fall back to 0 with the configured
+        // currency (Google accepts a zero-cost token; omitting the property is what
+        // triggers the "Brakujące pole" warning).
+        if ( $fees === 'ReturnShippingFees' ) {
+            $rate = isset( $opts['store_shipping_rate'] ) ? (float) $opts['store_shipping_rate'] : 0.0;
+            $currency = strtoupper( wp_strip_all_tags( (string) ( $opts['store_currency'] ?? 'PLN' ) ) );
+            $policy['returnShippingFeesAmount'] = [
+                '@type'    => 'MonetaryAmount',
+                'value'    => (string) $rate,
+                'currency' => $currency,
+            ];
+        }
+
+        return $policy;
     }
 
     /**

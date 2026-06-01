@@ -205,4 +205,76 @@ class Ligase_Suppressor {
         $opts = (array) get_option( 'ligase_options', array() );
         return ! empty( $opts['standalone_mode'] );
     }
+
+    /**
+     * Register the wp_head output-buffer scrubber for duplicate BreadcrumbList.
+     *
+     * Filters only catch hooks the competing emitter actually fires through. Many
+     * WooCommerce themes (XStore / Flatsome / Woodmart / Avada) inject their own
+     * `<script type="application/ld+json">{"@type":"BreadcrumbList",...}</script>`
+     * directly via `wp_footer` or template parts — no filter exists to intercept.
+     *
+     * Strategy: wrap the page render in an output buffer, then on shutdown scan
+     * for ALL JSON-LD blocks. Keep:
+     *   - Ligase's BreadcrumbList (identified by `@id` ending in `#breadcrumb`)
+     *   - All other JSON-LD (@graph blocks, Article, Product, etc.)
+     * Strip:
+     *   - Any other standalone BreadcrumbList scripts (the theme duplicates)
+     *
+     * Only active in standalone_mode — user has explicitly chosen Ligase as the
+     * canonical schema source. Without that flag we wouldn't dare touch foreign
+     * scripts.
+     */
+    public static function register_breadcrumb_scrubber(): void {
+        if ( ! self::is_active() ) {
+            return;
+        }
+        // template_redirect runs after WP knows the request type but before any
+        // header is sent — the safest point to open a page-wide ob.
+        add_action( 'template_redirect', array( __CLASS__, 'start_breadcrumb_buffer' ), 0 );
+    }
+
+    public static function start_breadcrumb_buffer(): void {
+        // Skip admin / REST / AJAX / feeds — only frontend HTML gets scrubbed.
+        if ( is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || is_feed() ) {
+            return;
+        }
+        ob_start( array( __CLASS__, 'dedupe_breadcrumb_jsonld' ) );
+    }
+
+    /**
+     * Output-buffer callback. Receives the full rendered HTML, returns it with
+     * duplicate BreadcrumbList JSON-LD scripts stripped. Defensive against
+     * unparseable JSON (skipped untouched) and against multi-node @graph blocks
+     * (passed through unchanged).
+     */
+    public static function dedupe_breadcrumb_jsonld( string $html ): string {
+        $pattern = '#<script\b[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>#is';
+        $kept_ligase = false;
+        return (string) preg_replace_callback( $pattern, function ( array $m ) use ( &$kept_ligase ) {
+            $body = trim( $m[1] );
+            $data = json_decode( $body, true );
+            if ( ! is_array( $data ) ) {
+                return $m[0]; // unparseable or non-JSON — leave alone
+            }
+            // @graph: don't touch — Ligase's main payload uses this shape
+            if ( isset( $data['@graph'] ) ) {
+                return $m[0];
+            }
+            // Inline single-node BreadcrumbList
+            if ( isset( $data['@type'] ) && $data['@type'] === 'BreadcrumbList' ) {
+                $id = (string) ( $data['@id'] ?? '' );
+                $is_ligase = $id !== '' && substr( $id, -11 ) === '#breadcrumb';
+                if ( $is_ligase && ! $kept_ligase ) {
+                    $kept_ligase = true;
+                    return $m[0];
+                }
+                // Either: duplicate of Ligase BreadcrumbList, or a theme/plugin
+                // BreadcrumbList we don't recognise. In standalone_mode we drop.
+                return '';
+            }
+            // Any other single-type node passes through.
+            return $m[0];
+        }, $html );
+    }
 }

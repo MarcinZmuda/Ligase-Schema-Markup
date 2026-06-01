@@ -99,6 +99,11 @@ class Ligase_Plugin {
         // Suppress other SEO plugins early (before they register wp_head output)
         add_action( 'wp_loaded', [ Ligase_Output::class, 'maybe_suppress_early' ] );
 
+        // Output-buffer dedupe for foreign BreadcrumbList JSON-LD that filters
+        // can't catch (WooCommerce themes inject inline scripts directly).
+        // Only fires in standalone_mode — checked inside the method.
+        add_action( 'wp_loaded', [ Ligase_Suppressor::class, 'register_breadcrumb_scrubber' ] );
+
         add_action( 'wp_head', [ Ligase_Output::class, 'render' ], 5 );
 
         add_action( 'save_post',      [ Ligase_Cache::class, 'invalidate_post_and_related' ] );

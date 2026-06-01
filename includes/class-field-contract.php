@@ -200,6 +200,12 @@ final class Ligase_Field_Contract {
 						'sources' => array( 'manual:', 'derive:return_fees_default' ),
 						'sanitize' => 'url',
 					),
+					'offers.hasMerchantReturnPolicy.refundType' => array(
+						'label'   => 'Forma zwrotu',
+						'level'   => 'optional',
+						'sources' => array( 'manual:', 'derive:refund_type_default' ),
+						'sanitize' => 'url',
+					),
 					// returnShippingFeesAmount — schema.org requires when returnFees is
 					// ReturnShippingFees (klient płaci za zwrot) so Google knows the cost.
 					// derived helpers read store_shipping_rate + store_currency from options.
