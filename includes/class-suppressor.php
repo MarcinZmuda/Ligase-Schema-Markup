@@ -31,6 +31,14 @@ class Ligase_Suppressor {
                 [ 'wpseo_schema_graph_pieces', '__return_empty_array' ],
                 // Legacy — returns final <script> string
                 [ 'wpseo_json_ld_output', '__return_false' ],
+                // Yoast 21+ — BreadcrumbList survived wpseo_schema_graph cut in some
+                // production sites (theme override / TEC integration). Belt the
+                // breadcrumb-specific generators directly.
+                [ 'wpseo_schema_breadcrumb', '__return_empty_array' ],
+                [ 'wpseo_schema_breadcrumb_list_show', '__return_false' ],
+                [ 'wpseo_should_output_breadcrumbs_schema', '__return_false' ],
+                // Yoast 27.x explicit per-type generator hook
+                [ 'wpseo_schema_BreadcrumbList', '__return_empty_array' ],
             ],
             'jsonld_marker' => 'yoast', // for scrubber
         ],

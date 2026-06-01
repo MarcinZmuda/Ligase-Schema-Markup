@@ -12,6 +12,55 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! function_exists( 'ligase_guess_schema_type_for_post' ) ) {
+	/**
+	 * Guess the most appropriate schema.org type for a post when no explicit
+	 * override or global default is set. Used by the admin posts list, the
+	 * Audytor preview, and the score calculator's "expected type" hint.
+	 *
+	 * Priority:
+	 *   1. WooCommerce product → Product
+	 *   2. CPT 'page' + slug/title heuristic (Kontakt → ContactPage,
+	 *      O nas → AboutPage, Koszyk/Zamówienie → CheckoutPage, etc.)
+	 *   3. CPT 'post' → BlogPosting (the only sensible default for a blog post)
+	 *   4. Any other CPT → WebPage (don't assume articles outside the post type)
+	 */
+	function ligase_guess_schema_type_for_post( int $post_id ): string {
+		$pt = get_post_type( $post_id );
+		if ( $pt === 'product' && function_exists( 'wc_get_product' ) ) {
+			return 'Product';
+		}
+		if ( $pt === 'post' ) {
+			return 'BlogPosting';
+		}
+		if ( $pt !== 'page' ) {
+			return 'WebPage';
+		}
+
+		// Slug/title heuristics for pages — Polish + English variants.
+		$slug  = (string) get_post_field( 'post_name', $post_id );
+		$title = strtolower( (string) get_the_title( $post_id ) );
+		$hay   = $slug . ' ' . $title;
+
+		$patterns = array(
+			'ContactPage'   => array( 'kontakt', 'contact' ),
+			'AboutPage'     => array( 'o-nas', 'o-mnie', 'about', 'about-us', 'o-firmie' ),
+			'CheckoutPage'  => array( 'koszyk', 'cart', 'zamowienie', 'checkout', 'platnosc' ),
+			'CollectionPage'=> array( 'sklep', 'shop', 'blog', 'aktualnosci', 'oferta' ),
+			'FAQPage'       => array( 'faq', 'pytania', 'q-a' ),
+		);
+		foreach ( $patterns as $type => $needles ) {
+			foreach ( $needles as $needle ) {
+				if ( strpos( $hay, $needle ) !== false ) {
+					return $type;
+				}
+			}
+		}
+
+		return 'WebPage';
+	}
+}
+
 $paged    = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 $per_page = 20;
 
@@ -327,7 +376,20 @@ $allowed_schema_types = array( 'BlogPosting', 'Article', 'NewsArticle', 'TechArt
 				$post_score  = $score_calculator->calculate_for_post( $post_id );
 				$score_val   = $post_score['score'];
 				$opts_global  = (array) get_option( 'ligase_options', array() );
-				$schema_type = get_post_meta( $post_id, '_ligase_schema_type', true ) ?: ( $opts_global['default_schema_type'] ?? 'BlogPosting' );
+
+				// Type resolution priority:
+				//   1. Per-post override (_ligase_schema_type) — explicit user choice
+				//   2. Global default_schema_type from settings
+				//   3. Smart fallback based on post_type + slug/title heuristics —
+				//      avoids defaulting EVERY page to "BlogPosting", which Google rejects
+				//      for non-article content (Kontakt/Koszyk/Konto are NOT articles).
+				$schema_type = get_post_meta( $post_id, '_ligase_schema_type', true );
+				if ( ! $schema_type ) {
+					$schema_type = (string) ( $opts_global['default_schema_type'] ?? '' );
+				}
+				if ( ! $schema_type ) {
+					$schema_type = ligase_guess_schema_type_for_post( $post_id );
+				}
 
 				// Collect enabled flags for the badge column.
 				$enabled_flags = array();

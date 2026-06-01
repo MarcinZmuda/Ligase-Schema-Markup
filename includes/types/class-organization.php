@@ -98,16 +98,21 @@ class Ligase_Type_Organization {
             ) );
         }
 
-        // Store-level merchant policies — emitted once, referenced from product Offers
-        // by @id. Saves payload + maintenance cost across thousands of products.
+        // Store-level merchant return policy — `hasMerchantReturnPolicy` IS a valid
+        // property of OnlineStore (via the Organization → OnlineStore type chain), so
+        // Google and schema.org Validator accept it here. Product Offers can reference
+        // it by @id to save payload across large catalogs.
+        //
+        // `shippingDetails` is NOT a valid property of OnlineStore in schema.org — it
+        // only exists on Offer / OfferShippingDetails. Emitting it on Organization
+        // produces the "Property shippingDetails was not recognised by the schema (e.g.
+        // schema.org) as part of an object of type OnlineStore" error. The site-level
+        // values from settings are instead inlined into every Product Offer (see
+        // Ligase_Type_Product::build_offer) so each Offer is self-contained.
         if ( $is_store ) {
             $return_policy = $this->build_store_return_policy( $opts );
             if ( $return_policy ) {
                 $schema['hasMerchantReturnPolicy'] = $return_policy;
-            }
-            $shipping = $this->build_store_shipping( $opts );
-            if ( $shipping ) {
-                $schema['shippingDetails'] = $shipping;
             }
         }
 

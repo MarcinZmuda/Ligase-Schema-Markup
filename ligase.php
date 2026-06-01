@@ -5,7 +5,7 @@
  * Description:       Complete schema.org JSON-LD for WordPress blogs. BlogPosting, Person,
  *                    Organization, BreadcrumbList, FAQPage, HowTo, VideoObject, and more.
  *                    Schema Auditor replaces weak markup. Compliant with Google guidelines March 2026.
- * Version:           2.4.9
+ * Version:           2.4.10
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Marcin Żmuda
@@ -17,7 +17,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LIGASE_VERSION', '2.4.9' );
+define( 'LIGASE_VERSION', '2.4.10' );
 define( 'LIGASE_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'LIGASE_URL',     plugin_dir_url( __FILE__ ) );
 define( 'LIGASE_FILE',    __FILE__ );
@@ -32,7 +32,36 @@ add_action( 'plugins_loaded', function() {
 register_activation_hook( __FILE__, function() {
     update_option( 'ligase_show_onboarding', '1' );
     update_option( 'ligase_activated_at', time() );
+
+    // Reset OPcache after install/activation. Without this, PHP-FPM workers on
+    // shared hosts (Smarthost / cPanel / DirectAdmin) keep the OLD compiled
+    // class-settings.php in memory — sanitize() ends up missing fields added
+    // in the new version, and checkbox toggles silently revert on Save. This
+    // bit users on 2.4.6 → 2.4.7 upgrades (org_author_mode never persisted)
+    // and again on 2.4.7 → 2.4.8 (default_schema_type). Reset eliminates the
+    // class of bug across upgrades.
+    if ( function_exists( 'opcache_reset' ) ) {
+        @opcache_reset();
+    }
 } );
+
+// Same reset after WP's plugin upgrader finishes — covers the "Replace current
+// with uploaded" path which doesn't always trigger the activation hook.
+add_action( 'upgrader_process_complete', function( $upgrader, $hook_extra ) {
+    if ( empty( $hook_extra['type'] ) || $hook_extra['type'] !== 'plugin' ) {
+        return;
+    }
+    $plugins = $hook_extra['plugins'] ?? array();
+    if ( ! is_array( $plugins ) ) {
+        return;
+    }
+    foreach ( $plugins as $p ) {
+        if ( strpos( (string) $p, 'ligase' ) !== false && function_exists( 'opcache_reset' ) ) {
+            @opcache_reset();
+            break;
+        }
+    }
+}, 10, 2 );
 
 // Deactivation hook — clear scheduled cron events so they don't keep firing
 // against missing class handlers after deactivate. Full data cleanup happens

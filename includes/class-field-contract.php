@@ -165,6 +165,77 @@ final class Ligase_Field_Contract {
 						'sources' => array( 'manual:', 'opt:store_return_days' ),
 						'sanitize' => 'int',
 					),
+					// returnPolicyCategory — schema.org enum. Window is finite by default
+					// because merchantReturnDays is always > 0 when the policy is emitted.
+					// Without this property Google flags "Brakujące pole returnPolicyCategory".
+					'offers.hasMerchantReturnPolicy.returnPolicyCategory' => array(
+						'label'   => 'Kategoria polityki zwrotów',
+						'level'   => 'recommended',
+						'sources' => array( 'manual:', 'derive:return_policy_category' ),
+						'sanitize' => 'url',
+					),
+					'offers.hasMerchantReturnPolicy.returnMethod' => array(
+						'label'   => 'Sposób zwrotu',
+						'level'   => 'optional',
+						'sources' => array( 'manual:', 'derive:return_method' ),
+						'sanitize' => 'url',
+					),
+					'offers.hasMerchantReturnPolicy.returnFees' => array(
+						'label'   => 'Opłaty za zwrot',
+						'level'   => 'recommended',
+						// store_return_fees is a bare enum string (e.g. 'FreeReturn'); the
+						// derive: helper reads it from options and prepends https://schema.org/.
+						// Using 'opt:' directly would route the raw enum through the 'url'
+						// sanitizer, which esc_url_raw's into an empty string.
+						'sources' => array( 'manual:', 'derive:return_fees_default' ),
+						'sanitize' => 'url',
+					),
+
+					// --- shippingDetails (Google Merchant Listings — wymaga peł nej struktury) ---
+					// shippingDetails NIE może być @id ref do OnlineStore (schema.org tego
+					// nie pozwala). Dlatego inline w każdy Offer, z opt: site-level fallback.
+					'offers.shippingDetails.shippingRate.value' => array(
+						'label'    => 'Stawka wysyłki',
+						'level'    => 'recommended',
+						'sources'  => array( 'manual:', 'opt:store_shipping_rate' ),
+						'sanitize' => 'float',
+					),
+					'offers.shippingDetails.shippingRate.currency' => array(
+						'label'    => 'Waluta wysyłki',
+						'level'    => 'recommended',
+						'sources'  => array( 'manual:', 'opt:store_currency' ),
+						'sanitize' => 'text',
+					),
+					'offers.shippingDetails.shippingDestination.addressCountry' => array(
+						'label'    => 'Kraj wysyłki',
+						'level'    => 'recommended',
+						'sources'  => array( 'manual:', 'opt:store_shipping_country' ),
+						'sanitize' => 'country',
+					),
+					'offers.shippingDetails.deliveryTime.handlingTime.minValue' => array(
+						'label'    => 'Handling time min (dni)',
+						'level'    => 'optional',
+						'sources'  => array( 'manual:', 'opt:store_handling_min' ),
+						'sanitize' => 'int',
+					),
+					'offers.shippingDetails.deliveryTime.handlingTime.maxValue' => array(
+						'label'    => 'Handling time max (dni)',
+						'level'    => 'optional',
+						'sources'  => array( 'manual:', 'opt:store_handling_max' ),
+						'sanitize' => 'int',
+					),
+					'offers.shippingDetails.deliveryTime.transitTime.minValue' => array(
+						'label'    => 'Transit time min (dni)',
+						'level'    => 'optional',
+						'sources'  => array( 'manual:', 'opt:store_transit_min' ),
+						'sanitize' => 'int',
+					),
+					'offers.shippingDetails.deliveryTime.transitTime.maxValue' => array(
+						'label'    => 'Transit time max (dni)',
+						'level'    => 'optional',
+						'sources'  => array( 'manual:', 'opt:store_transit_max' ),
+						'sanitize' => 'int',
+					),
 
 					// --- AggregateRating (tylko z prawdziwych opinii — manual action ryzyko) ---
 					'aggregateRating.ratingValue' => array(

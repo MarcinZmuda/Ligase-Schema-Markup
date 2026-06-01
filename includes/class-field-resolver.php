@@ -320,6 +320,28 @@ final class Ligase_Field_Resolver {
 			$n = (int) get_comments_number( $post_id );
 			return $n > 0 ? $n : null;
 		}
+		// returnPolicyCategory — Google's enum. We always emit a finite window because
+		// merchantReturnDays is itself > 0 when the policy exists. Sites can override
+		// per-product to MerchantReturnNotPermitted / MerchantReturnUnlimitedWindow.
+		if ( $what === 'return_policy_category' ) {
+			return 'https://schema.org/MerchantReturnFiniteReturnWindow';
+		}
+		// returnMethod — Polish e-commerce defaults to ReturnByMail (kurier zwrotny).
+		if ( $what === 'return_method' ) {
+			return 'https://schema.org/ReturnByMail';
+		}
+		// returnFees default when site-level option isn't set yet. Conservative choice:
+		// ReturnShippingFees (klient płaci za odesłanie) is the most common PL setup.
+		// Sites that offer free returns will set store_return_fees=FreeReturn explicitly.
+		if ( $what === 'return_fees_default' ) {
+			$opts = (array) get_option( 'ligase_options', array() );
+			$fee  = (string) ( $opts['store_return_fees'] ?? 'ReturnShippingFees' );
+			$allowed = array( 'FreeReturn', 'ReturnFeesCustomerResponsibility', 'ReturnShippingFees', 'RestockingFees' );
+			if ( ! in_array( $fee, $allowed, true ) ) {
+				$fee = 'ReturnShippingFees';
+			}
+			return 'https://schema.org/' . $fee;
+		}
 		return null;
 	}
 

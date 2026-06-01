@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.8
+Stable tag: 2.4.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,53 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.10 =
+**Schema.org validator fix (shippingDetails na OnlineStore odrzucone), returnPolicyCategory + smart type detection + OPcache auto-reset.**
+
+**shippingDetails na OnlineStore = invalid schema.** Wcześniej Organization w trybie store emitowała `shippingDetails` na poziomie Organization/OnlineStore — schema.org Validator słusznie odrzucał ("Property shippingDetails was not recognised by the schema as part of an object of type OnlineStore"). Property `shippingDetails` istnieje TYLKO na `Offer` / `OfferShippingDetails`, nie na Organization. Fix:
+* Organization przestaje emitować `shippingDetails`. `hasMerchantReturnPolicy` zostaje (jest dozwolone na OnlineStore).
+* Każdy Product Offer inline'uje teraz site-level shipping z opcji (zamiast `@id` ref do nieistniejącego `#shipping-policy`). Cost: kilka linii JSON więcej per produkt. Benefit: każdy Offer jest self-contained Merchant Listing który Google + Validator akceptują.
+
+**Brakujące pola MerchantReturnPolicy.** Field_Contract nie deklarował `returnPolicyCategory`, `returnMethod`, `returnFees` na ścieżce site-level — Field_Resolver ich nie emitował, Google flag'ował "Brakujące pole returnPolicyCategory". Dodane:
+* `returnPolicyCategory` → derived `https://schema.org/MerchantReturnFiniteReturnWindow` (bo `merchantReturnDays > 0`).
+* `returnMethod` → derived `https://schema.org/ReturnByMail` (PL e-commerce default).
+* `returnFees` → derived z opcji `store_return_fees` z prefixem `https://schema.org/`.
+* `shippingDetails.*` (8 sub-properties) — pełna struktura field-contract dla site-level shipping inline'u.
+
+**Smart schema type detection.** Pages w admin liście "Ligase → Posty" pokazywały się jako `BlogPosting` (sztywny hardcode-fallback gdy nie ma override + global default). To było UI prediction (front emitował WebPage), ale mylące. Teraz funkcja `ligase_guess_schema_type_for_post()`:
+* WooCommerce produkt → `Product`
+* `post_type === 'post'` → `BlogPosting`
+* Page slug/title zawiera "kontakt"/"contact" → `ContactPage`
+* "o-nas"/"about" → `AboutPage`
+* "koszyk"/"cart"/"zamowienie"/"checkout" → `CheckoutPage`
+* "sklep"/"shop"/"blog"/"aktualnosci" → `CollectionPage`
+* "faq"/"pytania" → `FAQPage`
+* inne pages → `WebPage`
+
+**OPcache auto-reset.** Po install + po WP "Replace current with uploaded" auto-fires `opcache_reset()` jeśli funkcja dostępna. Bez tego shared-host PHP-FPM (Smarthost / cPanel / DirectAdmin) trzymał skompilowaną starą wersję `class-settings.php` z mniejszą sanitize() whitelist'ą. Symptom: nowo dodane checkboxy "klikały się, ale wracały do unchecked po Save". Bug wystąpił na 2.4.6→2.4.7 (`org_author_mode`) i 2.4.7→2.4.8 (`default_schema_type`, `health_report_enabled`). Auto-reset eliminuje tę klasę regresji.
+
+**Yoast BreadcrumbList duplikat.** Dodane 4 nowe filter'y Yoast 27.x dla BreadcrumbList: `wpseo_schema_breadcrumb`, `wpseo_schema_breadcrumb_list_show`, `wpseo_should_output_breadcrumbs_schema`, `wpseo_schema_BreadcrumbList`. Gdy `standalone_mode` ON, Yoast nie powinien już emitować swojego BreadcrumbList.
+
+= 2.4.8 =
+
+Pages domyślnie pokazywały się w panelu "Ligase → Posty" jako `BlogPosting` (sztywny fallback gdy ani per-post override ani globalny default_schema_type nie ustawione). To było UI prediction, nie realny output JSON-LD (generator zawsze emitował WebPage dla pages), ale mylące i prowadziło do podejrzeń że schema jest zła. Teraz:
+* **WooCommerce produkt** → Product
+* **post_type `post`** → BlogPosting
+* **page slug/title** zawiera "kontakt"/"contact" → ContactPage
+* zawiera "o-nas"/"o-mnie"/"about" → AboutPage
+* zawiera "koszyk"/"cart"/"zamowienie"/"checkout" → CheckoutPage
+* zawiera "sklep"/"shop"/"blog" → CollectionPage
+* zawiera "faq"/"pytania" → FAQPage
+* inne pages → WebPage (Google-safe default)
+
+Funkcja jest globalna (`ligase_guess_schema_type_for_post( int $post_id ): string`), więc Audytor i Score też mogą jej używać do dopasowania check-listy do realnego typu strony.
+
+**OPcache reset po install/update** — funkcja `opcache_reset()` jest teraz wywoływana w:
+* `register_activation_hook` (przy każdym Aktywuj)
+* `upgrader_process_complete` (po WP-side "Replace current with uploaded")
+
+Bez tego shared-host PHP-FPM (Smarthost / cPanel / DirectAdmin) trzymał skompilowaną starą wersję `class-settings.php` z mniejszą `sanitize()` whitelist'ą. Symptom: nowo dodane checkboxy/dropdowny "klikały się, ale wracały do unchecked po Save". Bug wystąpił na linii upgrade'ów 2.4.6→2.4.7 (`org_author_mode`) i 2.4.7→2.4.8 (`default_schema_type`, `health_report_enabled`). Auto-reset eliminuje tę klasę regresji raz na zawsze.
 
 = 2.4.8 =
 **Multi-agent production audit — 14 bug fixes including 4 score-killer typos and 1 FPM state leak.**

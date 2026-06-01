@@ -350,9 +350,47 @@ class Ligase_Type_Product {
                 ],
             ];
         } else {
+            // Inline site-level shipping into each Offer. shippingDetails is NOT a valid
+            // property of OnlineStore in schema.org, so we can't @id-reference it from
+            // Organization any more (see class-organization.php). Cost: a few extra lines
+            // of JSON per product. Benefit: each Offer is a self-contained Merchant
+            // Listing that Google + Schema Markup Validator both accept.
             $opts = (array) get_option( 'ligase_options', [] );
             if ( ! empty( $opts['store_shipping_country'] ) ) {
-                $offer['shippingDetails'] = [ '@id' => home_url( '/#shipping-policy' ) ];
+                $store_country  = strtoupper( wp_strip_all_tags( (string) $opts['store_shipping_country'] ) );
+                $store_currency = wp_strip_all_tags( (string) ( $opts['store_currency'] ?? 'PLN' ) );
+                $store_rate     = (string) (float) ( $opts['store_shipping_rate'] ?? 0 );
+                $h_min = max( 0, (int) ( $opts['store_handling_min'] ?? 0 ) );
+                $h_max = max( $h_min, (int) ( $opts['store_handling_max'] ?? max( 1, $h_min ) ) );
+                $t_min = max( 0, (int) ( $opts['store_transit_min'] ?? 1 ) );
+                $t_max = max( $t_min, (int) ( $opts['store_transit_max'] ?? max( 3, $t_min ) ) );
+                $offer['shippingDetails'] = [
+                    '@type'               => 'OfferShippingDetails',
+                    'shippingRate'        => [
+                        '@type'    => 'MonetaryAmount',
+                        'value'    => $store_rate,
+                        'currency' => $store_currency,
+                    ],
+                    'shippingDestination' => [
+                        '@type'          => 'DefinedRegion',
+                        'addressCountry' => $store_country,
+                    ],
+                    'deliveryTime' => [
+                        '@type'        => 'ShippingDeliveryTime',
+                        'handlingTime' => [
+                            '@type'    => 'QuantitativeValue',
+                            'minValue' => $h_min,
+                            'maxValue' => $h_max,
+                            'unitCode' => 'DAY',
+                        ],
+                        'transitTime'  => [
+                            '@type'    => 'QuantitativeValue',
+                            'minValue' => $t_min,
+                            'maxValue' => $t_max,
+                            'unitCode' => 'DAY',
+                        ],
+                    ],
+                ];
             }
         }
 
