@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.6
+Stable tag: 2.4.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,13 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.7 =
+**Store tab not visible (2.4.6 ship bug) + 2 checkboxes silently never saved.**
+
+* **Store / E-commerce tab missing from UI** — 2.4.6 added the `SECTION_STORE` PHP section but the settings view (`admin/views/settings.php`) uses a custom hand-built tab nav, not the default WP Settings API rendering. The new section was registered server-side but never appeared in the tab strip. Added explicit `store` tab entry between Local Business and AI/NER.
+* **`org_author_mode` and `lb_service_area` checkboxes — silently never saved.** The `Ligase_Settings::sanitize()` checkbox loop hard-codes which keys to persist. Only 4 keys were listed: `standalone_mode`, `force_output`, `debug_mode`, `store_mode`. The `org_author_mode` checkbox (added in 2.4.6) and `lb_service_area` (older) were missing from the list, so they rendered, accepted clicks, even checked the box visually after Save — but the option was wiped to empty in sanitize. Fix: extended the checkbox key whitelist.
+* No other code changes — 2.4.6 features (Store backend + Redakcja mode + per-user `ligase_is_redakcja`) now work end-to-end.
 
 = 2.4.6 =
 **Store / E-commerce settings UI + Organization-as-author (Redakcja) mode wired.**

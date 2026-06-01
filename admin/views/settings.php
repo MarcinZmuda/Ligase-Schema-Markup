@@ -25,6 +25,10 @@ $tabs = array(
 		'label'    => __( '📍 Local Business', 'ligase' ),
 		'sections' => array( Ligase_Settings::SECTION_LOCAL ),
 	),
+	'store' => array(
+		'label'    => __( '🛒 Store / E-commerce', 'ligase' ),
+		'sections' => array( Ligase_Settings::SECTION_STORE ),
+	),
 	'ai' => array(
 		'label'    => __( '🤖 AI / NER', 'ligase' ),
 		'sections' => array( 'ligase_ner_section' ),

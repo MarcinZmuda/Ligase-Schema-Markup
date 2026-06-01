@@ -639,8 +639,18 @@ class Ligase_Settings {
 			}
 		}
 
-		// Checkboxes
-		foreach ( array( 'standalone_mode', 'force_output', 'debug_mode', 'store_mode' ) as $key ) {
+		// Checkboxes — must include EVERY checkbox field added via add_field('checkbox')
+		// or the value silently never gets saved (WP Settings API issue with sanitize()
+		// starting from defaults: untouched keys are reset, AND missing checkbox input
+		// from a partial POST defaults to empty string).
+		foreach ( array(
+			'standalone_mode',
+			'force_output',
+			'debug_mode',
+			'store_mode',
+			'org_author_mode',   // ← previously missing, made the checkbox visually click but never persist
+			'lb_service_area',   // ← same regression risk
+		) as $key ) {
 			$clean[ $key ] = ! empty( $input[ $key ] ) ? '1' : '';
 		}
 
