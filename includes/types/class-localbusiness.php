@@ -182,7 +182,23 @@ class Ligase_Type_LocalBusiness {
 		}
 
 		// ── Address (PostalAddress) ───────────────────────────────────────────
-		$schema['address'] = $this->build_address( $opts );
+		// For service-area businesses (lb_service_area = '1'), omit `address` unless
+		// at least addressLocality + addressCountry are filled — Google supports
+		// service-area businesses without a public street address since 2018.
+		$is_service_area = self::is_service_area_business();
+		if ( $is_service_area ) {
+			$partial = $this->build_address( $opts );
+			// Only emit address when we have *some* useful locality/country signal.
+			$has_partial = isset( $partial['addressLocality'] ) || isset( $partial['addressCountry'] );
+			if ( $has_partial ) {
+				// Drop streetAddress for service-area businesses (the whole point is no
+				// public storefront); keep locality + country + region for context.
+				unset( $partial['streetAddress'] );
+				$schema['address'] = $partial;
+			}
+		} else {
+			$schema['address'] = $this->build_address( $opts );
+		}
 
 		// ── Geo coordinates → hasMap ──────────────────────────────────────────
 		$lat = (float) ( $opts['lb_lat'] ?? 0 );
@@ -234,11 +250,38 @@ class Ligase_Type_LocalBusiness {
 	}
 
 	/**
-	 * Check if LocalBusiness is configured (address set = opt-in).
+	 * Check if LocalBusiness is configured.
+	 *
+	 * Two opt-in shapes are valid:
+	 *   1. Physical address — street + city set (classic LocalBusiness).
+	 *   2. Service-area business — `lb_service_area` checked AND `lb_area_served`
+	 *      filled. Plumbers / electricians / mobile services that operate without a
+	 *      public-facing address. Google supports this shape since 2018.
 	 */
 	public static function is_configured(): bool {
 		$opts = (array) get_option( 'ligase_options', array() );
-		return ! empty( $opts['lb_street'] ) && ! empty( $opts['lb_city'] );
+
+		// Mode 1 — physical address.
+		if ( ! empty( $opts['lb_street'] ) && ! empty( $opts['lb_city'] ) ) {
+			return true;
+		}
+
+		// Mode 2 — service-area business.
+		if ( ! empty( $opts['lb_service_area'] ) && (string) $opts['lb_service_area'] === '1'
+			&& ! empty( $opts['lb_area_served'] ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Whether this LocalBusiness operates as a service-area business (no fixed
+	 * public address). Read by `build()` to decide whether to emit `address`.
+	 */
+	public static function is_service_area_business(): bool {
+		$opts = (array) get_option( 'ligase_options', array() );
+		return ! empty( $opts['lb_service_area'] ) && (string) $opts['lb_service_area'] === '1';
 	}
 
 	/**

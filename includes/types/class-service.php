@@ -31,7 +31,8 @@ class Ligase_Type_Service {
 			return null;
 		}
 
-		if ( get_post_meta( $post_id, '_ligase_enable_service', true ) !== '1' ) {
+		if ( get_post_meta( $post_id, '_ligase_enable_service', true ) !== '1'
+			&& ! ( class_exists( 'Ligase_Schema_Rules' ) && Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_service', $post_id ) ) ) {
 			return null;
 		}
 

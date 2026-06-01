@@ -25,7 +25,7 @@ class Ligase_Type_Recipe {
         $post_id = get_the_ID();
 
         if ( get_post_meta( $post_id, '_ligase_enable_recipe', true ) !== '1'
-            && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_recipe', $post_id ) ) {
+            && ! ( class_exists( 'Ligase_Schema_Rules' ) && Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_recipe', $post_id ) ) ) {
             return null;
         }
 

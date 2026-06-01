@@ -262,8 +262,13 @@ class Ligase_Type_ItemList {
 
     private function current_url(): string {
         $scheme = is_ssl() ? 'https://' : 'http://';
-        $host   = isset( $_SERVER['HTTP_HOST'] ) ? (string) wp_unslash( $_SERVER['HTTP_HOST'] ) : (string) wp_parse_url( home_url(), PHP_URL_HOST );
-        $uri    = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
-        return esc_url_raw( $scheme . $host . $uri );
+        // HTTP_HOST may be present but empty under CLI / cron / REST contexts; treat
+        // empty-string the same as "missing" so we fall back to home_url()'s host.
+        $raw_host = isset( $_SERVER['HTTP_HOST'] ) ? (string) wp_unslash( $_SERVER['HTTP_HOST'] ) : '';
+        if ( $raw_host === '' ) {
+            $raw_host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+        }
+        $uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
+        return esc_url_raw( $scheme . $raw_host . $uri );
     }
 }

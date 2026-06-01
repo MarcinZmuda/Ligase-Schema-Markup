@@ -33,7 +33,7 @@ class Ligase_Type_DiscussionForumPosting {
         $pt   = get_post_type( $post_id );
         $cpt  = in_array( $pt, array( 'topic', 'reply', 'forum' ), true ); // bbPress
         $flag = get_post_meta( $post_id, '_ligase_enable_forum', true ) === '1';
-        $rule = Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_forum', $post_id );
+        $rule = class_exists( 'Ligase_Schema_Rules' ) ? Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_forum', $post_id ) : false;
 
         if ( ! $cpt && ! $flag && ! $rule ) {
             return null;
@@ -87,19 +87,24 @@ class Ligase_Type_DiscussionForumPosting {
         if ( empty( $comments ) ) {
             return array();
         }
-        return array_map(
-            function ( $c ) {
-                return array(
-                    '@type'         => 'Comment',
-                    'datePublished' => gmdate( 'c', strtotime( $c->comment_date_gmt ) ),
-                    'text'          => wp_strip_all_tags( $c->comment_content ),
-                    'author'        => array(
-                        '@type' => 'Person',
-                        'name'  => wp_strip_all_tags( $c->comment_author ),
-                    ),
-                );
-            },
-            $comments
-        );
+        $nodes = array();
+        foreach ( $comments as $c ) {
+            // Guard against empty/invalid comment_date_gmt (legacy imports). Without
+            // this, gmdate('c', false) emits 1970-01-01 which Google flags as invalid.
+            $ts = ! empty( $c->comment_date_gmt ) ? strtotime( $c->comment_date_gmt ) : false;
+            if ( ! $ts ) {
+                continue;
+            }
+            $nodes[] = array(
+                '@type'         => 'Comment',
+                'datePublished' => gmdate( 'c', $ts ),
+                'text'          => wp_strip_all_tags( $c->comment_content ),
+                'author'        => array(
+                    '@type' => 'Person',
+                    'name'  => wp_strip_all_tags( $c->comment_author ),
+                ),
+            );
+        }
+        return $nodes;
     }
 }

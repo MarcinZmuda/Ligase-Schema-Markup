@@ -162,20 +162,20 @@ class Ligase_Type_BlogPosting {
         // about — from entity pipeline hints (Wikidata-linked topics)
         $about_hints = get_post_meta( $post_id, '_ligase_about_entities', true );
         if ( ! empty( $about_hints ) && is_array( $about_hints ) ) {
-            $schema['about'] = array_map( fn( $e ) => [
+            $schema['about'] = array_values( array_map( fn( $e ) => [
                 '@type'  => 'Thing',
                 'name'   => wp_strip_all_tags( $e['name'] ?? '' ),
                 'sameAs' => esc_url( $e['sameAs'] ?? '' ),
-            ], array_slice( $about_hints, 0, 5 ) );
+            ], array_slice( $about_hints, 0, 5 ) ) );
         }
 
         // mentions — named entities detected in content
         $mentions = get_post_meta( $post_id, '_ligase_mentions', true );
         if ( ! empty( $mentions ) && is_array( $mentions ) ) {
-            $schema['mentions'] = array_map( fn( $m ) => [
+            $schema['mentions'] = array_values( array_map( fn( $m ) => [
                 '@type' => 'Thing',
                 'name'  => wp_strip_all_tags( $m['name'] ?? '' ),
-            ], array_slice( $mentions, 0, 10 ) );
+            ], array_slice( $mentions, 0, 10 ) ) );
         }
 
         // temporalCoverage — for news/history articles
@@ -187,24 +187,24 @@ class Ligase_Type_BlogPosting {
         // isBasedOn — cited sources
         $sources = get_post_meta( $post_id, '_ligase_sources', true );
         if ( ! empty( $sources ) && is_array( $sources ) ) {
-            $schema['isBasedOn'] = array_map( fn( $s ) => [
+            $schema['isBasedOn'] = array_values( array_map( fn( $s ) => [
                 '@type' => 'Article',
                 'name'  => wp_strip_all_tags( $s['name'] ?? '' ),
                 'url'   => esc_url( $s['url'] ?? '' ),
-            ], array_filter( $sources, fn( $s ) => ! empty( $s['url'] ) ) );
+            ], array_filter( $sources, fn( $s ) => ! empty( $s['url'] ) ) ) );
         }
 
         // hasPart — article series, merged with optional paywall WebPageElement above.
         $series_parts = get_post_meta( $post_id, '_ligase_series_parts', true );
         $series_nodes = [];
         if ( ! empty( $series_parts ) && is_array( $series_parts ) ) {
-            $series_nodes = array_map( fn( $part_id ) => [
+            $series_nodes = array_values( array_map( fn( $part_id ) => [
                 '@type'    => 'BlogPosting',
                 'headline' => wp_strip_all_tags( get_the_title( (int) $part_id ) ),
                 'url'      => esc_url( get_permalink( (int) $part_id ) ),
-            ], $series_parts );
+            ], $series_parts ) );
         }
-        $all_parts = array_merge( $paywall_parts, $series_nodes );
+        $all_parts = array_values( array_merge( $paywall_parts, $series_nodes ) );
         if ( ! empty( $all_parts ) ) {
             $schema['hasPart'] = count( $all_parts ) === 1 ? $all_parts[0] : $all_parts;
         }
@@ -218,7 +218,7 @@ class Ligase_Type_BlogPosting {
             }
             $citations = get_post_meta( $post_id, '_ligase_citations', true );
             if ( ! empty( $citations ) && is_array( $citations ) ) {
-                $schema['citation'] = array_map(
+                $schema['citation'] = array_values( array_map(
                     fn( $c ) => [
                         '@type' => 'CreativeWork',
                         'name'  => wp_strip_all_tags( $c['name'] ?? '' ),
@@ -228,7 +228,7 @@ class Ligase_Type_BlogPosting {
                         $citations,
                         fn( $c ) => is_array( $c ) && ! empty( $c['url'] )
                     )
-                );
+                ) );
             }
         }
 

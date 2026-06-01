@@ -30,7 +30,7 @@ class Ligase_Type_Product {
         // This lets stores get Product schema without ticking a per-post checkbox.
         $is_wc_product = get_post_type( $post_id ) === 'product' && function_exists( 'wc_get_product' );
         $manual_enabled = get_post_meta( $post_id, '_ligase_enable_product', true ) === '1';
-        $rules_enabled  = Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_product', $post_id );
+        $rules_enabled  = class_exists( 'Ligase_Schema_Rules' ) ? Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_product', $post_id ) : false;
 
         if ( ! $is_wc_product && ! $manual_enabled && ! $rules_enabled ) {
             return null;

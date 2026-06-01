@@ -319,9 +319,11 @@ class Ligase_Admin {
 			return;
 		}
 
-		// Check permissions.
+		// Check permissions. When the post_type is invalid / unregistered (e.g. CPT
+		// plugin disabled but a stale post remains) get_post_type_object() returns null;
+		// dereferencing ->cap fatals. Guard explicitly.
 		$post_type_obj = get_post_type_object( $post->post_type );
-		if ( ! current_user_can( $post_type_obj->cap->edit_post, $post_id ) ) {
+		if ( ! $post_type_obj || ! current_user_can( $post_type_obj->cap->edit_post, $post_id ) ) {
 			return;
 		}
 
@@ -580,8 +582,18 @@ class Ligase_Admin {
 			$incoming  = wp_unslash( $_POST['ligase_override'] );
 			$result    = $existing;
 
+			// Whitelist `$type` keys against the registered contract types — without
+			// this, the form could submit `ligase_override[Foo]` and persist arbitrary
+			// keys that some future code path might read.
+			$allowed_types = method_exists( 'Ligase_Field_Contract', 'types' )
+				? (array) Ligase_Field_Contract::types()
+				: array();
+
 			foreach ( $incoming as $type => $fields ) {
 				$type = sanitize_text_field( (string) $type );
+				if ( ! in_array( $type, $allowed_types, true ) ) {
+					continue;
+				}
 				if ( ! is_array( $fields ) ) {
 					continue;
 				}
@@ -839,12 +851,40 @@ class Ligase_Admin {
 			'ligase_member_of',       // repeater
 			'ligase_extra_sameas',    // URL per line
 		);
+		// Fields whose lines may contain URL tokens (separated by '|' or one per line).
+		// wp_strip_all_tags scrubs HTML but does NOT drop `javascript:` / `data:` /
+		// `vbscript:` schemes — pipe each URL-looking part through esc_url_raw() which
+		// only allows whitelisted protocols (http/https/mailto/etc.).
+		$url_bearing = array( 'ligase_credentials', 'ligase_member_of', 'ligase_extra_sameas' );
 		foreach ( $textarea_fields as $key ) {
 			if ( isset( $_POST[ $key ] ) ) {
 				$raw = (string) wp_unslash( $_POST[ $key ] );
 				// Normalize line endings, strip tags, keep newlines + pipes for repeaters.
 				$raw = wp_strip_all_tags( $raw );
 				$raw = preg_replace( "/\r\n|\r/", "\n", $raw );
+
+				if ( in_array( $key, $url_bearing, true ) ) {
+					$lines = explode( "\n", (string) $raw );
+					foreach ( $lines as $idx => $line ) {
+						if ( strpos( $line, '|' ) !== false ) {
+							$parts = array_map( 'trim', explode( '|', $line ) );
+							foreach ( $parts as $pi => $part ) {
+								// Recognise tokens that look like URLs (contain '://' or start with `javascript:` / `data:` etc).
+								if ( $part !== '' && preg_match( '#^([a-z][a-z0-9+\-.]*):#i', $part ) ) {
+									$parts[ $pi ] = esc_url_raw( $part );
+								}
+							}
+							$lines[ $idx ] = implode( ' | ', $parts );
+						} else {
+							$trimmed = trim( $line );
+							if ( $trimmed !== '' && preg_match( '#^([a-z][a-z0-9+\-.]*):#i', $trimmed ) ) {
+								$lines[ $idx ] = esc_url_raw( $trimmed );
+							}
+						}
+					}
+					$raw = implode( "\n", $lines );
+				}
+
 				update_user_meta( $user_id, $key, trim( (string) $raw ) );
 			}
 		}

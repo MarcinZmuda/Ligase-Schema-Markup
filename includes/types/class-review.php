@@ -24,7 +24,7 @@ class Ligase_Type_Review {
             return null;
         }
 
-        if ( get_post_meta( get_the_ID(), '_ligase_enable_review', true ) !== '1' && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_review', get_the_ID() ) ) {
+        if ( get_post_meta( get_the_ID(), '_ligase_enable_review', true ) !== '1' && ! ( class_exists( 'Ligase_Schema_Rules' ) && Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_review', get_the_ID() ) ) ) {
             return null;
         }
 
@@ -33,6 +33,12 @@ class Ligase_Type_Review {
         $review_data = get_post_meta( $post_id, '_ligase_review', true );
 
         if ( empty( $review_data ) || ! is_array( $review_data ) || empty( $review_data['rating'] ) ) {
+            return null;
+        }
+
+        // schema.org Review requires `itemReviewed`. Without item info the node is
+        // worthless — it asserts a verdict against nothing. Drop the whole Review.
+        if ( empty( $review_data['item_name'] ) ) {
             return null;
         }
 

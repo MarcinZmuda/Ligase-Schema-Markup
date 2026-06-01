@@ -85,6 +85,7 @@ class Ligase_Ajax {
 				array( 'message' => __( 'Invalid security token.', 'ligase' ) ),
 				403
 			);
+			return;
 		}
 
 		if ( ! current_user_can( $cap ) ) {
@@ -92,6 +93,7 @@ class Ligase_Ajax {
 				array( 'message' => __( 'Insufficient permissions.', 'ligase' ) ),
 				403
 			);
+			return;
 		}
 	}
 
@@ -105,6 +107,7 @@ class Ligase_Ajax {
 				array( 'message' => __( 'Invalid post or insufficient permissions for this post.', 'ligase' ) ),
 				403
 			);
+			return;
 		}
 	}
 
@@ -183,6 +186,7 @@ class Ligase_Ajax {
 
 		if ( ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid post ID.', 'ligase' ) ) );
+			return;
 		}
 
 		Ligase_Logger::info( sprintf( 'Scanning post %d.', $post_id ) );
@@ -197,6 +201,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( sprintf( 'Scan post %d failed: %s', $post_id, $e->getMessage() ) );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -220,6 +225,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Full site scan failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -235,6 +241,7 @@ class Ligase_Ajax {
 
 		if ( ! $post_id || ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid post ID.', 'ligase' ) ) );
+			return;
 		}
 
 		Ligase_Logger::info( sprintf( 'Fixing schema for post %d.', $post_id ) );
@@ -257,10 +264,12 @@ class Ligase_Ajax {
 			} else {
 				Ligase_Logger::warning( sprintf( 'Post %d fix returned no changes.', $post_id ) );
 				wp_send_json_error( array( 'message' => __( 'Could not apply replacement.', 'ligase' ) ) );
+				return;
 			}
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( sprintf( 'Fix post %d failed: %s', $post_id, $e->getMessage() ) );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -323,6 +332,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Batch fix failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -339,6 +349,7 @@ class Ligase_Ajax {
 
 		if ( ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid post ID.', 'ligase' ) ) );
+			return;
 		}
 
 		Ligase_Logger::info( sprintf( 'Generating JSON-LD preview for post %d.', $post_id ) );
@@ -359,6 +370,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( sprintf( 'JSON-LD preview for post %d failed: %s', $post_id, $e->getMessage() ) );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -378,10 +390,12 @@ class Ligase_Ajax {
 
 		if ( empty( $post_ids ) ) {
 			wp_send_json_error( array( 'message' => __( 'No post IDs provided.', 'ligase' ) ) );
+			return;
 		}
 
 		if ( ! in_array( $mode, array( 'replace', 'supplement', 'restore' ), true ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid mode. Use "replace", "supplement" or "restore".', 'ligase' ) ) );
+			return;
 		}
 
 		Ligase_Logger::info( sprintf( 'Applying audit action to %d posts (mode: %s, threshold: %d).', count( $post_ids ), $mode, $threshold ) );
@@ -435,6 +449,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Audit action failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -450,6 +465,7 @@ class Ligase_Ajax {
 
 		if ( empty( $name ) ) {
 			wp_send_json_error( array( 'message' => __( 'Name parameter is required.', 'ligase' ) ) );
+			return;
 		}
 
 		Ligase_Logger::info( sprintf( 'Wikidata search: "%s".', $name ) );
@@ -462,6 +478,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Wikidata search failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -489,6 +506,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Readiness score calculation failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -534,6 +552,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Author scores calculation failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -555,6 +574,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Plugin conflict detection failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -622,6 +642,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Settings export failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -637,6 +658,7 @@ class Ligase_Ajax {
 
 		if ( empty( $json_data ) ) {
 			wp_send_json_error( array( 'message' => __( 'No JSON data provided.', 'ligase' ) ) );
+			return;
 		}
 
 		Ligase_Logger::info( 'Importing plugin settings.' );
@@ -648,12 +670,14 @@ class Ligase_Ajax {
 				wp_send_json_error(
 					array( 'message' => __( 'Invalid JSON format.', 'ligase' ) )
 				);
+				return;
 			}
 
 			if ( ! is_array( $data ) || ! isset( $data['options'] ) ) {
 				wp_send_json_error(
 					array( 'message' => __( 'Invalid export file structure.', 'ligase' ) )
 				);
+				return;
 			}
 
 			// Whitelist allowed option keys
@@ -716,6 +740,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Settings import failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -736,6 +761,7 @@ class Ligase_Ajax {
 
 		if ( empty( $repairs ) ) {
 			wp_send_json_error( array( 'message' => __( 'No valid repair operations specified.', 'ligase' ) ) );
+			return;
 		}
 
 		Ligase_Logger::info( sprintf( 'Running auto-repair: %s.', implode( ', ', $repairs ) ) );
@@ -840,6 +866,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Auto-repair failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -862,6 +889,7 @@ class Ligase_Ajax {
 		} catch ( \Exception $e ) {
 			Ligase_Logger::error( 'Cache clear failed: ' . $e->getMessage() );
 			wp_send_json_error( array( 'message' => $e->getMessage() ) );
+			return;
 		}
 	}
 
@@ -882,6 +910,7 @@ class Ligase_Ajax {
 		$source = isset( $_POST['source'] ) ? sanitize_key( $_POST['source'] ) : '';
 		if ( empty( $source ) ) {
 			wp_send_json_error( array( 'message' => 'Missing source parameter.' ) );
+			return;
 		}
 
 		$importer = new Ligase_Importer();
@@ -901,6 +930,7 @@ class Ligase_Ajax {
 		$this->verify_post_access( $post_id );
 		if ( ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => 'Invalid post ID.' ) );
+			return;
 		}
 
 		$validator = new Ligase_Validator();
@@ -931,12 +961,14 @@ class Ligase_Ajax {
 		$json = isset( $_POST['service_account_json'] ) ? wp_unslash( $_POST['service_account_json'] ) : '';
 		if ( empty( $json ) ) {
 			wp_send_json_error( array( 'message' => 'Brak danych JSON.' ) );
+			return;
 		}
 
 		$result = Ligase_GSC::save_service_account( $json );
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+			return;
 		}
 
 		// Optionally set site URL
@@ -962,11 +994,13 @@ class Ligase_Ajax {
 		$token = Ligase_GSC::get_access_token();
 		if ( is_wp_error( $token ) ) {
 			wp_send_json_error( array( 'message' => $token->get_error_message() ) );
+			return;
 		}
 
 		$sites = Ligase_GSC::list_sites();
 		if ( is_wp_error( $sites ) ) {
 			wp_send_json_error( array( 'message' => $sites->get_error_message() ) );
+			return;
 		}
 
 		wp_send_json_success( array(
@@ -992,6 +1026,7 @@ class Ligase_Ajax {
 		$data = Ligase_GSC::get_rich_results_data();
 		if ( is_wp_error( $data ) ) {
 			wp_send_json_error( array( 'message' => $data->get_error_message() ) );
+			return;
 		}
 
 		wp_send_json_success( $data );
@@ -1010,6 +1045,7 @@ class Ligase_Ajax {
 		$post_id = absint( $_POST['post_id'] ?? 0 );
 		if ( ! $post_id || ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => 'Invalid post ID.' ) );
+			return;
 		}
 
 		$ner = new Ligase_NER_API();
@@ -1019,6 +1055,7 @@ class Ligase_Ajax {
 				'message' => 'AI NER provider not configured. Go to Ligase → Settings → AI Entity Detection.',
 				'code'    => 'not_configured',
 			) );
+			return;
 		}
 
 		// Force fresh result (clear cache)
@@ -1032,6 +1069,7 @@ class Ligase_Ajax {
 				'message' => 'AI NER failed. Check your API key and try again.',
 				'code'    => 'api_error',
 			) );
+			return;
 		}
 
 		wp_send_json_success( array(
@@ -1054,6 +1092,7 @@ class Ligase_Ajax {
 				'message' => 'AI NER provider not configured.',
 				'code'    => 'not_configured',
 			) );
+			return;
 		}
 
 		$force     = ! empty( $_POST['force'] );
@@ -1098,10 +1137,12 @@ class Ligase_Ajax {
 
 		if ( ! $post_id || ! get_post( $post_id ) ) {
 			wp_send_json_error( array( 'message' => 'Invalid post ID.' ) );
+			return;
 		}
 
 		if ( ! is_array( $entities ) ) {
 			wp_send_json_error( array( 'message' => 'Invalid entities data.' ) );
+			return;
 		}
 
 		// Sanitize
@@ -1176,6 +1217,7 @@ class Ligase_Ajax {
 		$rule_data = wp_unslash( $_POST['rule'] ?? array() );
 		if ( ! is_array( $rule_data ) ) {
 			wp_send_json_error( array( 'message' => 'Invalid rule data.' ) );
+			return;
 		}
 
 		// Sanitize
@@ -1190,6 +1232,7 @@ class Ligase_Ajax {
 
 		if ( empty( $rule['schema_keys'] ) ) {
 			wp_send_json_error( array( 'message' => 'Select at least one schema type.' ) );
+			return;
 		}
 
 		// Validate schema keys against whitelist
@@ -1201,6 +1244,7 @@ class Ligase_Ajax {
 
 		if ( empty( $rule['schema_keys'] ) ) {
 			wp_send_json_error( array( 'message' => 'Invalid schema type.' ) );
+			return;
 		}
 
 		$rules = Ligase_Schema_Rules::get_rules();
@@ -1232,6 +1276,7 @@ class Ligase_Ajax {
 		$rule_id = sanitize_key( $_POST['rule_id'] ?? '' );
 		if ( ! $rule_id ) {
 			wp_send_json_error( array( 'message' => 'Missing rule_id.' ) );
+			return;
 		}
 
 		$rules   = Ligase_Schema_Rules::get_rules();
@@ -1272,6 +1317,7 @@ class Ligase_Ajax {
 
 		if ( ! in_array( $type, $allowed, true ) ) {
 			wp_send_json_error( array( 'message' => 'Nieprawidłowy typ schema.' ) );
+			return;
 		}
 
 		global $wpdb;
@@ -1359,11 +1405,21 @@ class Ligase_Ajax {
 		$post_ids = $this->bulk_resolve_post_ids( $post_type, $term_slug );
 		if ( empty( $post_ids ) ) {
 			wp_send_json_success( array( 'matched' => 0, 'updated' => 0, 'message' => __( 'Brak pozycji pasujących do filtra.', 'ligase' ) ) );
+			return;
 		}
 
 		$updated = 0;
+		$skipped = 0;
 		foreach ( $post_ids as $pid ) {
-			$pid     = (int) $pid;
+			$pid = (int) $pid;
+			// Per-post capability check. The flag list includes `_ligase_paywalled`
+			// which is sensitive per-post; manage_options alone is not sufficient when
+			// the operating user does not actually own / can edit the specific post
+			// (e.g. multi-author setup where admin role was reduced).
+			if ( ! current_user_can( 'edit_post', $pid ) ) {
+				$skipped++;
+				continue;
+			}
 			$changed = false;
 			foreach ( $flags as $key ) {
 				update_post_meta( $pid, $key, $value );
@@ -1394,6 +1450,7 @@ class Ligase_Ajax {
 		wp_send_json_success( array(
 			'matched' => count( $post_ids ),
 			'updated' => $updated,
+			'skipped' => $skipped,
 			'flags'   => $flags,
 			'value'   => $value,
 		) );

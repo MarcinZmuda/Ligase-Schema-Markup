@@ -11,7 +11,7 @@ class Ligase_Type_Course {
 
         $post_id = get_the_ID();
 
-        if ( get_post_meta( $post_id, '_ligase_enable_course', true ) !== '1' && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_course', $post_id ) ) {
+        if ( get_post_meta( $post_id, '_ligase_enable_course', true ) !== '1' && ! ( class_exists( 'Ligase_Schema_Rules' ) && Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_course', $post_id ) ) ) {
             return null;
         }
 

@@ -101,7 +101,7 @@ class Ligase_Plugin {
 
         add_action( 'wp_head', [ Ligase_Output::class, 'render' ], 5 );
 
-        add_action( 'save_post',      [ Ligase_Cache::class, 'invalidate_post' ] );
+        add_action( 'save_post',      [ Ligase_Cache::class, 'invalidate_post_and_related' ] );
         add_action( 'save_post',      function() { delete_transient( 'ligase_site_score' ); } );
 
         // Scope cache invalidation to plugin-relevant options only. The previous unconditional

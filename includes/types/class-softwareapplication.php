@@ -11,7 +11,7 @@ class Ligase_Type_SoftwareApplication {
 
         $post_id = get_the_ID();
 
-        if ( get_post_meta( $post_id, '_ligase_enable_software', true ) !== '1' && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_software', $post_id ) ) {
+        if ( get_post_meta( $post_id, '_ligase_enable_software', true ) !== '1' && ! ( class_exists( 'Ligase_Schema_Rules' ) && Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_software', $post_id ) ) ) {
             return null;
         }
 
@@ -73,14 +73,19 @@ class Ligase_Type_SoftwareApplication {
         ];
 
         // Rating (if Review is also enabled, link them)
+        //
+        // ratingCount must reflect real reviews. Defaulting to '1' when missing is
+        // a fake-rating signal (Google manual action: structured-data spam). Require
+        // an explicit, positive rating_count; otherwise omit aggregateRating entirely.
         if ( ! empty( $data['rating'] ) ) {
             $rating = (float) $data['rating'];
-            if ( $rating >= 1 && $rating <= 5 ) {
+            $count  = isset( $data['rating_count'] ) ? (int) $data['rating_count'] : 0;
+            if ( $rating >= 1 && $rating <= 5 && $count > 0 ) {
                 $schema['aggregateRating'] = [
                     '@type'       => 'AggregateRating',
                     'ratingValue' => (string) $rating,
                     'bestRating'  => '5',
-                    'ratingCount' => (string) ( $data['rating_count'] ?? '1' ),
+                    'ratingCount' => (string) $count,
                 ];
             }
         }

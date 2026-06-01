@@ -11,7 +11,7 @@ class Ligase_Type_Event {
 
         $post_id = get_the_ID();
 
-        if ( get_post_meta( $post_id, '_ligase_enable_event', true ) !== '1' && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_event', $post_id ) ) {
+        if ( get_post_meta( $post_id, '_ligase_enable_event', true ) !== '1' && ! ( class_exists( 'Ligase_Schema_Rules' ) && Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_event', $post_id ) ) ) {
             return null;
         }
 
@@ -21,17 +21,29 @@ class Ligase_Type_Event {
             return null;
         }
 
+        // ISO 8601 validation for startDate. Without it, free-text dates like
+        // "tomorrow at 6pm" reach Google and disqualify the rich result.
+        $iso_re        = '/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+\-]\d{2}:\d{2}|Z)?)?$/';
+        $start_raw     = wp_strip_all_tags( (string) $data['start_date'] );
+        if ( ! preg_match( $iso_re, $start_raw ) ) {
+            // Event without a valid startDate is invalid schema — drop the node entirely.
+            return null;
+        }
+
         $schema = [
             '@type'     => 'Event',
             '@id'       => esc_url( get_permalink() ) . '#event',
             'name'      => wp_strip_all_tags( $data['name'] ),
-            'startDate' => wp_strip_all_tags( $data['start_date'] ),
+            'startDate' => $start_raw,
             'organizer' => [ '@id' => home_url( '/#org' ) ],
             'url'       => esc_url( get_permalink() ),
         ];
 
         if ( ! empty( $data['end_date'] ) ) {
-            $schema['endDate'] = wp_strip_all_tags( $data['end_date'] );
+            $end_raw = wp_strip_all_tags( (string) $data['end_date'] );
+            if ( preg_match( $iso_re, $end_raw ) ) {
+                $schema['endDate'] = $end_raw;
+            }
         }
 
         if ( ! empty( $data['description'] ) ) {

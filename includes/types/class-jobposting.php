@@ -29,7 +29,7 @@ class Ligase_Type_JobPosting {
         $pt   = get_post_type( $post_id );
         $cpt  = in_array( $pt, array( 'job_listing', 'job', 'jobs' ), true );
         $flag = get_post_meta( $post_id, '_ligase_enable_jobposting', true ) === '1';
-        $rule = Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_jobposting', $post_id );
+        $rule = class_exists( 'Ligase_Schema_Rules' ) ? Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_jobposting', $post_id ) : false;
 
         if ( ! $cpt && ! $flag && ! $rule ) {
             return null;

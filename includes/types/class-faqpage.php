@@ -9,7 +9,7 @@ class Ligase_Type_FAQPage {
             return null;
         }
 
-        if ( get_post_meta( get_the_ID(), '_ligase_enable_faq', true ) !== '1' && ! Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_faq', get_the_ID() ) ) {
+        if ( get_post_meta( get_the_ID(), '_ligase_enable_faq', true ) !== '1' && ! ( class_exists( 'Ligase_Schema_Rules' ) && Ligase_Schema_Rules::is_enabled_for_post( '_ligase_enable_faq', get_the_ID() ) ) ) {
             return null;
         }
 

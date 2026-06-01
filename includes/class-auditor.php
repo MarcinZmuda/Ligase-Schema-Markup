@@ -84,22 +84,18 @@ class Ligase_Auditor {
 	}
 
 	/**
-	 * Hook into wp_head via output buffering.
+	 * @deprecated 2.4.9 Live wp_head intercept was never wired in plugin bootstrap and
+	 *             produced more confusion than value. All production auditor needs are
+	 *             served by the batch-AJAX scan flow (admin → Audytor page), which calls
+	 *             scan_all_posts() / apply_replacement() directly. This method is kept as
+	 *             a no-op stub for backward compatibility with any external code that
+	 *             still references it; it intentionally does nothing.
 	 *
 	 * @return void
 	 */
 	public function intercept(): void {
-		if ( ! is_singular() ) {
-			return;
-		}
-
-		// Safety: don't nest output buffers
-		if ( ob_get_level() > 3 ) {
-			Ligase_Logger::warning( 'Too many output buffer levels, skipping auditor intercept' );
-			return;
-		}
-
-		ob_start( array( $this, 'process_buffer' ) );
+		// Intentional no-op. See deprecation note above. Use the batch-scan AJAX
+		// endpoints (ligase_scan_all_posts / ligase_apply_audit_replacements) instead.
 	}
 
 	/**
