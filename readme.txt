@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.11
+Stable tag: 2.4.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,19 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.12 =
+**Organization: `image` + `address` (PostalAddress) — Google "Firmy lokalne" flags.**
+
+Rich Results Test "Firmy lokalne" na OnlineStore #org flag'ował 2 brakujące pola:
+* "Brakujące pole `address`"
+* "Brakujące pole `image`"
+
+Naprawione:
+* `image` na Organization/OnlineStore — reuse logo URL. Google traktuje to jako legalne (większość schema generators tak robi). Bez tego LocalBusiness/OnlineStore check pokazuje warning.
+* `address` jako PostalAddress — pobierane z LocalBusiness option group (`lb_street`/`lb_city`/`lb_region`/`lb_postal`/`lb_country`). Emituje się tylko gdy minimum street LUB city jest wypełnione — pusty PostalAddress to anti-pattern.
+
+Aby pole `address` rzeczywiście pojawiło się w JSON-LD: wypełnij **WP Admin → Ligase → Ustawienia → LocalBusiness** street + city. Reszta (region, postal, country) jest opcjonalna. Pure-online stores bez fizycznego adresu mogą zostawić puste — wtedy `address` nie jest emitowane (zamiast emitować pusty obiekt).
 
 = 2.4.11 =
 **Field_Resolver: @type stamping na deliveryTime/handlingTime/transitTime + returnShippingFeesAmount + unitCode DAY.**

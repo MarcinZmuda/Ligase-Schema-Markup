@@ -24,6 +24,24 @@ class Ligase_Type_Organization {
         $logo = $this->build_logo( $opts );
         if ( $logo ) {
             $schema['logo'] = $logo;
+            // `image` is a separate recommended property on Organization/OnlineStore.
+            // Google's "Firmy lokalne" (LocalBusiness) check flags it as missing when
+            // only `logo` exists. Reusing the logo URL is the convention every major
+            // schema generator follows — schema.org permits the same URL in both.
+            if ( is_array( $logo ) && ! empty( $logo['url'] ) ) {
+                $schema['image'] = $logo['url'];
+            } elseif ( is_string( $logo ) ) {
+                $schema['image'] = $logo;
+            }
+        }
+
+        // PostalAddress — pulled from the LocalBusiness option group because that's
+        // the only place the plugin already collects street/city/postal. When the
+        // site has no physical address (pure online store), the entire block is
+        // omitted rather than emitting an empty PostalAddress.
+        $address = $this->build_org_address( $opts );
+        if ( $address ) {
+            $schema['address'] = $address;
         }
 
         $social_keys = [
@@ -177,6 +195,47 @@ class Ligase_Type_Organization {
                 'transitTime'  => [ '@type' => 'QuantitativeValue', 'minValue' => $t_min, 'maxValue' => $t_max, 'unitCode' => 'DAY' ],
             ],
         ];
+    }
+
+    /**
+     * Build PostalAddress for the Organization from the LocalBusiness option group.
+     * Returns null when no usable address parts are filled in — emitting an empty
+     * PostalAddress hurts more than omitting (Validator flags it as malformed).
+     *
+     * Country defaults to PL for site-wide org addresses without an explicit value,
+     * because that's the only language the plugin's admin UI is localised in and
+     * most installations are PL-based; the lb_country setting overrides.
+     */
+    private function build_org_address( array $opts ): ?array {
+        $street  = trim( (string) ( $opts['lb_street']  ?? '' ) );
+        $city    = trim( (string) ( $opts['lb_city']    ?? '' ) );
+        $region  = trim( (string) ( $opts['lb_region']  ?? '' ) );
+        $postal  = trim( (string) ( $opts['lb_postal']  ?? '' ) );
+        $country = strtoupper( trim( (string) ( $opts['lb_country'] ?? '' ) ) );
+
+        // Need at least street OR city for an address node to be useful. Without
+        // any locality data PostalAddress is just noise.
+        if ( $street === '' && $city === '' ) {
+            return null;
+        }
+
+        $address = array( '@type' => 'PostalAddress' );
+        if ( $street !== '' ) {
+            $address['streetAddress'] = wp_strip_all_tags( $street );
+        }
+        if ( $city !== '' ) {
+            $address['addressLocality'] = wp_strip_all_tags( $city );
+        }
+        if ( $region !== '' ) {
+            $address['addressRegion'] = wp_strip_all_tags( $region );
+        }
+        if ( $postal !== '' ) {
+            $address['postalCode'] = wp_strip_all_tags( $postal );
+        }
+        if ( strlen( $country ) === 2 ) {
+            $address['addressCountry'] = $country;
+        }
+        return $address;
     }
 
     private function build_logo( array $opts ): ?array {
