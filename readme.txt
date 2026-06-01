@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.15
+Stable tag: 2.4.16
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,19 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.16 =
+**ItemList Karuzele: usunięto duplikat `url` + dodano `@id` per-Offer (ostatnie 2 critical Rich Results errors).**
+
+Po 2.4.15 karuzela kategorii miała wciąż 2 krytyczne "Podano identyczne wartości właściwości". Powód: każdy inline Product w karuzeli miał JEDNOCZEŚNIE `@id` (z fragmentem `#product`) ORAZ `url` (bez fragmentu) — base URL identyczny dla danego produktu. Plus każdy Offer wyglądał strukturalnie identycznie (`@type: Offer`, taka sama waluta, dostępność, seller `@id`) — bez unique `@id` parser widział N offerów jako duplikat.
+
+Fix:
+* Usunięto `url` z inline `Product` w karuzeli (`@id` carries the URL).
+* Usunięto `url` z inline `Article` w karuzeli (parytet).
+* Usunięto `url` z `Offer` w karuzeli (duplikowało base URL z Product `@id`).
+* Dodano unique `@id` per Offer (`{url}#offer`) — każdy Offer ma teraz distinct identity w grafie.
+
+Te zmiany dotyczą TYLKO inline ItemList nodes — pełna ścieżka Product na stronie produktu (`class-product.php`) zachowuje `url` (potrzebne dla self-contained Merchant Listing).
 
 = 2.4.15 =
 **ItemList: wykluczające się właściwości + duplikat url (CRITICAL Rich Results error).**

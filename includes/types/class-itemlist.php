@@ -208,11 +208,15 @@ class Ligase_Type_ItemList {
      * render a Product carousel entry (name + image + offer + url).
      */
     private function build_inline_product( WC_Product $product, string $url ): array {
+        // Inline carousel Product nodes intentionally OMIT `url` — the @id already
+        // carries the canonical URL (with #product fragment for graph-linking), and
+        // emitting both `@id: .../#product` + `url: ...` produces "Podano identyczne
+        // wartości właściwości" warnings on Google's Karuzele check because the two
+        // values share their base URL across all N items in the list.
         $node = array(
             '@type' => 'Product',
             '@id'   => esc_url( $url ) . '#product',
             'name'  => wp_strip_all_tags( $product->get_name() ),
-            'url'   => esc_url( $url ),
         );
 
         $img_id = $product->get_image_id();
@@ -236,10 +240,15 @@ class Ligase_Type_ItemList {
 
             $node['offers'] = array(
                 '@type'         => 'Offer',
+                // Unique @id per offer so the carousel doesn't show N structurally
+                // identical Offers (same currency / availability / seller @id),
+                // which Google flags as duplicate properties on the ItemList.
+                '@id'           => esc_url( $url ) . '#offer',
                 'price'         => (string) (float) $price,
                 'priceCurrency' => $currency,
                 'availability'  => $availability,
-                'url'           => esc_url( $url ),
+                // Offer.url removed — it duplicates the parent Product.@id base URL
+                // and aggravates the "identyczne wartości właściwości" check.
                 'seller'        => array( '@id' => home_url( '/#org' ) ),
             );
         }
@@ -251,11 +260,13 @@ class Ligase_Type_ItemList {
      * Inline Article-shaped node for blog/category list items.
      */
     private function build_inline_article( WP_Post $post, string $url, string $name ): array {
+        // Same rationale as inline Product — @id carries the URL, separate `url`
+        // would duplicate across all N carousel items and trip the duplicate-values
+        // check.
         $node = array(
             '@type'         => 'Article',
             '@id'           => esc_url( $url ) . '#posting',
             'headline'      => $name,
-            'url'           => esc_url( $url ),
             'datePublished' => get_post_time( 'c', true, $post ),
         );
 
