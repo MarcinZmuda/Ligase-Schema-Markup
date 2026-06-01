@@ -342,6 +342,26 @@ final class Ligase_Field_Resolver {
 			}
 			return 'https://schema.org/' . $fee;
 		}
+		// returnShippingFeesAmount.value — only meaningful when the policy charges
+		// the customer for return shipping. For FreeReturn this should not emit,
+		// which is achieved by returning null (resolver drops null nodes).
+		if ( $what === 'return_fees_amount_value' ) {
+			$opts = (array) get_option( 'ligase_options', array() );
+			$fee  = (string) ( $opts['store_return_fees'] ?? '' );
+			if ( $fee !== 'ReturnShippingFees' ) {
+				return null;
+			}
+			$rate = isset( $opts['store_shipping_rate'] ) ? (float) $opts['store_shipping_rate'] : 0.0;
+			if ( $rate <= 0 ) {
+				return null;
+			}
+			return $rate;
+		}
+		// unitCode for QuantitativeValue used in handlingTime/transitTime — always DAY
+		// in our context (the field-contract values are integer days).
+		if ( $what === 'unit_code_day' ) {
+			return 'DAY';
+		}
 		return null;
 	}
 

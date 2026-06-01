@@ -71,9 +71,19 @@ final class Ligase_Field_Contract {
 				'_containers' => array(
 					'offers'                                    => 'Offer',
 					'offers.hasMerchantReturnPolicy'            => 'MerchantReturnPolicy',
+					// returnShippingFeesAmount only emits when returnFees=ReturnShippingFees;
+					// declared here so when present it carries proper @type.
+					'offers.hasMerchantReturnPolicy.returnShippingFeesAmount' => 'MonetaryAmount',
 					'offers.shippingDetails'                    => 'OfferShippingDetails',
 					'offers.shippingDetails.shippingRate'       => 'MonetaryAmount',
 					'offers.shippingDetails.shippingDestination' => 'DefinedRegion',
+					// deliveryTime + nested handling/transit need explicit @type so the
+					// resolver emits "@type": "ShippingDeliveryTime" / "QuantitativeValue"
+					// instead of an untyped object that Validator flags as
+					// "Nieprawidłowy typ obiektu w polu handlingTime".
+					'offers.shippingDetails.deliveryTime'                => 'ShippingDeliveryTime',
+					'offers.shippingDetails.deliveryTime.handlingTime'   => 'QuantitativeValue',
+					'offers.shippingDetails.deliveryTime.transitTime'    => 'QuantitativeValue',
 					'aggregateRating'                           => 'AggregateRating',
 					'brand'                                     => 'Brand',
 				),
@@ -190,6 +200,21 @@ final class Ligase_Field_Contract {
 						'sources' => array( 'manual:', 'derive:return_fees_default' ),
 						'sanitize' => 'url',
 					),
+					// returnShippingFeesAmount — schema.org requires when returnFees is
+					// ReturnShippingFees (klient płaci za zwrot) so Google knows the cost.
+					// derived helpers read store_shipping_rate + store_currency from options.
+					'offers.hasMerchantReturnPolicy.returnShippingFeesAmount.value' => array(
+						'label'    => 'Koszt zwrotu',
+						'level'    => 'optional',
+						'sources'  => array( 'manual:', 'derive:return_fees_amount_value' ),
+						'sanitize' => 'float',
+					),
+					'offers.hasMerchantReturnPolicy.returnShippingFeesAmount.currency' => array(
+						'label'    => 'Waluta zwrotu',
+						'level'    => 'optional',
+						'sources'  => array( 'manual:', 'opt:store_currency' ),
+						'sanitize' => 'text',
+					),
 
 					// --- shippingDetails (Google Merchant Listings — wymaga peł nej struktury) ---
 					// shippingDetails NIE może być @id ref do OnlineStore (schema.org tego
@@ -224,6 +249,12 @@ final class Ligase_Field_Contract {
 						'sources'  => array( 'manual:', 'opt:store_handling_max' ),
 						'sanitize' => 'int',
 					),
+					'offers.shippingDetails.deliveryTime.handlingTime.unitCode' => array(
+						'label'    => 'Jednostka handlingTime',
+						'level'    => 'optional',
+						'sources'  => array( 'derive:unit_code_day' ),
+						'sanitize' => 'text',
+					),
 					'offers.shippingDetails.deliveryTime.transitTime.minValue' => array(
 						'label'    => 'Transit time min (dni)',
 						'level'    => 'optional',
@@ -235,6 +266,12 @@ final class Ligase_Field_Contract {
 						'level'    => 'optional',
 						'sources'  => array( 'manual:', 'opt:store_transit_max' ),
 						'sanitize' => 'int',
+					),
+					'offers.shippingDetails.deliveryTime.transitTime.unitCode' => array(
+						'label'    => 'Jednostka transitTime',
+						'level'    => 'optional',
+						'sources'  => array( 'derive:unit_code_day' ),
+						'sanitize' => 'text',
 					),
 
 					// --- AggregateRating (tylko z prawdziwych opinii — manual action ryzyko) ---

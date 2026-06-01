@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.10
+Stable tag: 2.4.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,23 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.11 =
+**Field_Resolver: @type stamping na deliveryTime/handlingTime/transitTime + returnShippingFeesAmount + unitCode DAY.**
+
+Rich Results Test flag'ował na produkcji makumi.eu po 2.4.10:
+* "Nieprawidłowy typ obiektu w polu handlingTime (opcjonalnie)"
+* "Nieprawidłowy typ obiektu w polu transitTime (opcjonalnie)"
+* "Brakujące pole returnShippingFeesAmount (opcjonalnie)"
+
+Przyczyna: w Field_Contract brakowało deklaracji `_containers` dla `deliveryTime`, `handlingTime`, `transitTime` — Field_Resolver budował te obiekty bez stempla `@type`, walidator widział je jako goły `StructuredValue` zamiast `QuantitativeValue`/`ShippingDeliveryTime`.
+
+Plus brak `returnShippingFeesAmount` gdy `returnFees: ReturnShippingFees` — Google chce kwoty którą klient zapłaci za zwrot.
+
+Naprawione:
+* 3 nowe containers w field-contract: `deliveryTime` → `ShippingDeliveryTime`, `handlingTime`/`transitTime` → `QuantitativeValue`, `returnShippingFeesAmount` → `MonetaryAmount`.
+* 2 nowe fields `unitCode` (handling + transit) → derived `'DAY'`.
+* 2 nowe fields `returnShippingFeesAmount.value` + `.currency` — derived z `store_shipping_rate` + `store_currency` (tylko gdy `store_return_fees=ReturnShippingFees` i `store_shipping_rate > 0`).
 
 = 2.4.10 =
 **Schema.org validator fix (shippingDetails na OnlineStore odrzucone), returnPolicyCategory + smart type detection + OPcache auto-reset.**
