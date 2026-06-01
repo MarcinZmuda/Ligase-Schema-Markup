@@ -212,7 +212,10 @@ final class Ligase_Field_Resolver {
 					'outofstock'  => 'https://schema.org/OutOfStock',
 					'onbackorder' => 'https://schema.org/BackOrder',
 				);
-				return $map[ $stock ] ?? 'https://schema.org/InStock';
+				// Unknown stock status (3rd-party plugins add 'preorder', 'discontinued')
+				// → return null. Previously defaulted to InStock which is misleading-info
+				// → manual-action risk.
+				return $map[ $stock ] ?? null;
 			case 'image':
 				$tid = $product->get_image_id();
 				if ( ! $tid ) { return null; }
@@ -378,8 +381,40 @@ final class Ligase_Field_Resolver {
 			case 'url':
 				return is_string( $value ) ? esc_url_raw( $value ) : $value;
 			case 'int':
+				// Polish/EU number formatting: "1 299" or "1.299" → 1299, not 1.
+				// Strip everything that isn't a digit / minus / decimal separator first.
+				if ( is_string( $value ) ) {
+					$clean = preg_replace( '/[^\d\-]/', '', $value );
+					return (int) ( $clean === '' || $clean === '-' ? 0 : $clean );
+				}
 				return (int) $value;
 			case 'float':
+				// "1 299,90 zł" / "1.299,90" → 1299.9 (not 1.0 from naïve cast).
+				// Strategy: strip currency symbols/spaces/letters, then normalise the
+				// decimal separator. We assume the LAST comma or dot is the decimal,
+				// any earlier are thousands separators to remove.
+				if ( is_string( $value ) ) {
+					$clean = preg_replace( '/[^\d,\.\-]/', '', $value );
+					if ( $clean === '' || $clean === '-' ) {
+						return 0.0;
+					}
+					$last_comma = strrpos( $clean, ',' );
+					$last_dot   = strrpos( $clean, '.' );
+					$dec_pos = false;
+					if ( $last_comma !== false && $last_dot !== false ) {
+						$dec_pos = max( $last_comma, $last_dot );
+					} elseif ( $last_comma !== false ) {
+						$dec_pos = $last_comma;
+					} elseif ( $last_dot !== false ) {
+						$dec_pos = $last_dot;
+					}
+					if ( $dec_pos === false ) {
+						return (float) $clean;
+					}
+					$int_part  = preg_replace( '/[^\d\-]/', '', substr( $clean, 0, $dec_pos ) );
+					$frac_part = preg_replace( '/[^\d]/', '',  substr( $clean, $dec_pos + 1 ) );
+					return (float) ( $int_part . '.' . $frac_part );
+				}
 				return (float) $value;
 			case 'date':
 				if ( is_string( $value ) && $value !== '' ) {

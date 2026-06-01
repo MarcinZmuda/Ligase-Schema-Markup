@@ -67,15 +67,34 @@ class Ligase_Type_VideoObject {
     }
 
     private function build_from_meta( array $meta, int $post_id ): array {
-        $schema = [
+        // Name + thumbnailUrl + uploadDate are required for VideoObject rich result.
+        // Previously this method emitted empty strings when meta was missing — Google
+        // marks the schema invalid AND it's an SEO-spam signal ("we said we have a video
+        // but we don't"). Now: only emit fields that have real values; if essentials
+        // missing → return null and let Generator drop the node.
+        $name      = wp_strip_all_tags( (string) ( $meta['name'] ?? get_the_title( $post_id ) ) );
+        $thumbnail = (string) ( $meta['thumbnail'] ?? '' );
+        $embed     = (string) ( $meta['embed_url'] ?? '' );
+        $content   = (string) ( $meta['content_url'] ?? '' );
+
+        if ( $name === '' || $thumbnail === '' || ( $embed === '' && $content === '' ) ) {
+            return array();
+        }
+
+        $schema = array(
             '@type'        => 'VideoObject',
-            'name'         => wp_strip_all_tags( $meta['name'] ?? get_the_title( $post_id ) ),
-            'thumbnailUrl' => esc_url( $meta['thumbnail'] ?? '' ),
-            'uploadDate'   => wp_strip_all_tags( $meta['upload_date'] ?? get_the_date( 'c', $post_id ) ),
-            'embedUrl'     => esc_url( $meta['embed_url'] ),
-        ];
-        if ( ! empty( $meta['duration'] ) && preg_match( '/^P(?:\d+[YMWD])*(?:T(?:\d+[HMS])*)?$/', $meta['duration'] ) ) {
-            $schema['duration'] = wp_strip_all_tags( $meta['duration'] );
+            '@id'          => esc_url( get_permalink( $post_id ) ) . '#video',
+            'name'         => $name,
+            'thumbnailUrl' => esc_url( $thumbnail ),
+            'uploadDate'   => wp_strip_all_tags( (string) ( $meta['upload_date'] ?? get_the_date( 'c', $post_id ) ) ),
+        );
+        if ( $embed !== '' )   { $schema['embedUrl']   = esc_url( $embed ); }
+        if ( $content !== '' ) { $schema['contentUrl'] = esc_url( $content ); }
+        if ( ! empty( $meta['description'] ) ) {
+            $schema['description'] = wp_strip_all_tags( (string) $meta['description'] );
+        }
+        if ( ! empty( $meta['duration'] ) && preg_match( '/^P(?:\d+[YMWD])*(?:T(?:\d+[HMS])*)?$/', (string) $meta['duration'] ) ) {
+            $schema['duration'] = wp_strip_all_tags( (string) $meta['duration'] );
         }
         return $schema;
     }

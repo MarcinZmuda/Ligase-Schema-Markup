@@ -57,7 +57,7 @@ class Ligase_Type_ClaimReview {
             '@id'           => esc_url( get_permalink() ) . '#claimreview',
             'url'           => esc_url( get_permalink() ),
             'datePublished' => get_the_date( 'c' ),
-            'author'        => [ '@id' => home_url( '/#author-' . $author_id ) ],
+            'author'        => [ '@id' => Ligase_Type_BlogPosting::author_ref_id( (int) $author_id ) ],
             'publisher'     => [ '@id' => home_url( '/#org' ) ],
             'claimReviewed' => wp_strip_all_tags( $claim ),
             'reviewRating'  => [

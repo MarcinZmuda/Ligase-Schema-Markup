@@ -149,7 +149,7 @@ class Ligase_Importer {
         }
 
         // Author meta from Yoast user meta
-        $authors = get_users( [ 'has_published_posts' => true, 'fields' => 'ID' ] );
+        $authors = get_users( [ 'has_published_posts' => array( 'post' ), 'fields' => 'ID' ] );
         foreach ( $authors as $uid ) {
             $tw = get_user_meta( $uid, 'twitter', true );
             if ( $tw && ! get_user_meta( $uid, 'ligase_twitter', true ) ) {

@@ -76,7 +76,12 @@ class Ligase_Type_JobPosting {
                     $addr['addressLocality'] = wp_strip_all_tags( (string) $manual['jobLocationCity'] );
                 }
                 if ( ! empty( $manual['jobLocationCountry'] ) ) {
-                    $addr['addressCountry'] = strtoupper( substr( (string) $manual['jobLocationCountry'], 0, 2 ) );
+                    // Normalize to ISO 3166-1 alpha-2: strip non-letters, uppercase, must be
+                    // exactly 2 chars. Reject "Poland"/"Polska" rather than mangle to "PO".
+                    $cc = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) $manual['jobLocationCountry'] ) );
+                    if ( strlen( $cc ) === 2 ) {
+                        $addr['addressCountry'] = $cc;
+                    }
                 }
                 $node['jobLocation'] = array(
                     '@type'   => 'Place',

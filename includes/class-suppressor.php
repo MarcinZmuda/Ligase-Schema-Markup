@@ -187,7 +187,14 @@ class Ligase_Suppressor {
         return $this->suppressed;
     }
 
+    /**
+     * `Standalone Mode` is the user-controlled flag that actually drives output
+     * decisions. Reading it fresh on every call avoids the FPM-worker leak of the
+     * legacy `self::$is_active` static (which kept stale values across requests
+     * if OPcache or persistent processes preserved class state).
+     */
     public static function is_active(): bool {
-        return self::$is_active;
+        $opts = (array) get_option( 'ligase_options', array() );
+        return ! empty( $opts['standalone_mode'] );
     }
 }

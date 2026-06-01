@@ -25,7 +25,12 @@ class Ligase_Type_BlogPosting {
         if ( ! empty( $opts['org_author_mode'] ) ) {
             return home_url( '/#org' );
         }
-        if ( $author_id > 0 && get_user_meta( $author_id, 'ligase_is_redakcja', true ) === '1' ) {
+        // Orphaned posts (author deleted) or invalid author_id → fallback to Organization
+        // rather than emitting a dangling `#author-0` reference that points to nothing.
+        if ( $author_id <= 0 || ! get_userdata( $author_id ) ) {
+            return home_url( '/#org' );
+        }
+        if ( get_user_meta( $author_id, 'ligase_is_redakcja', true ) === '1' ) {
             return home_url( '/#org' );
         }
         return home_url( '/#author-' . $author_id );

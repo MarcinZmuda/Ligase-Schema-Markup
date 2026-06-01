@@ -254,7 +254,7 @@ class Ligase_Type_ItemList {
 
         $author_id = (int) $post->post_author;
         if ( $author_id > 0 ) {
-            $node['author'] = array( '@id' => home_url( '/#author-' . $author_id ) );
+            $node['author'] = array( '@id' => Ligase_Type_BlogPosting::author_ref_id( (int) $author_id ) );
         }
 
         return $node;

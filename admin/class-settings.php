@@ -593,6 +593,7 @@ class Ligase_Settings {
 		$text_fields = array(
 			'org_name', 'org_description', 'org_phone', 'knows_about',
 			'speakable_selectors', 'ner_provider',
+			'default_schema_type',  // ← was a ghost field before 2.4.8 — dropdown saved nothing
 			'lb_type', 'lb_name', 'lb_description',
 			'lb_street', 'lb_city', 'lb_region', 'lb_postal', 'lb_country',
 			'lb_lat', 'lb_lng', 'lb_price_range', 'lb_area_served',
@@ -642,14 +643,16 @@ class Ligase_Settings {
 		// Checkboxes — must include EVERY checkbox field added via add_field('checkbox')
 		// or the value silently never gets saved (WP Settings API issue with sanitize()
 		// starting from defaults: untouched keys are reset, AND missing checkbox input
-		// from a partial POST defaults to empty string).
+		// from a partial POST defaults to empty string). When you add a new checkbox
+		// elsewhere, ALWAYS append the key here too — there's no automatic detection.
 		foreach ( array(
 			'standalone_mode',
 			'force_output',
 			'debug_mode',
 			'store_mode',
-			'org_author_mode',   // ← previously missing, made the checkbox visually click but never persist
-			'lb_service_area',   // ← same regression risk
+			'org_author_mode',
+			'lb_service_area',
+			'health_report_enabled',  // ← was ghost: turning ON merged via defaults but turning OFF never persisted
 		) as $key ) {
 			$clean[ $key ] = ! empty( $input[ $key ] ) ? '1' : '';
 		}

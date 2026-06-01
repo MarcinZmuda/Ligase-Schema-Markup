@@ -49,7 +49,7 @@ class Ligase_Type_Review {
 
         $schema = [
             '@type'       => 'Review',
-            'author'      => [ '@id' => home_url( '/#author-' . $author_id ) ],
+            'author'      => [ '@id' => Ligase_Type_BlogPosting::author_ref_id( (int) $author_id ) ],
             'publisher'   => [ '@id' => home_url( '/#org' ) ],
             'datePublished' => get_the_date( 'c', $post_id ),
             'reviewRating' => [

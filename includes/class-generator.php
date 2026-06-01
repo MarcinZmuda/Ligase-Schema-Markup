@@ -57,6 +57,7 @@ class Ligase_Generator {
             case 'blog_listing':
                 $graph[] = $this->build_collection_page();
                 $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
+                $graph[] = ( new Ligase_Type_ItemList() )->build();
                 break;
             case 'taxonomy_archive':
                 $graph[] = $this->build_collection_page();
@@ -70,8 +71,6 @@ class Ligase_Generator {
                 $graph[]   = $this->build_collection_page();
                 $graph[]   = ( new Ligase_Type_ItemList() )->build();
                 break;
-            case 'blog_listing':
-                // (already handled above; ItemList added there too via fall-through fix)
             case 'date_or_search':
                 $graph[] = $this->build_collection_page();
                 break;
@@ -221,38 +220,49 @@ class Ligase_Generator {
     private function with_post_globals( WP_Post $post, callable $fn ): void {
         global $wp_query;
 
+        // Edge case: AMP renderers, REST controllers, and a few page-builders call
+        // do_action('wp_head') with $wp_query unset or set to a non-WP_Query object.
+        // Without this guard the writes below fatal with "Attempt to assign property
+        // on null". We still set $GLOBALS['post'] so the type classes work — they
+        // mostly use get_the_*() which falls back to $post.
+        $has_query = $wp_query instanceof WP_Query;
+
         $original_post     = $GLOBALS['post'] ?? null;
-        $original_singular = $wp_query->is_singular   ?? false;
-        $original_is_single = $wp_query->is_single    ?? false;
-        $original_is_page   = $wp_query->is_page      ?? false;
-        $original_is_arch   = $wp_query->is_archive   ?? false;
-        $original_is_tax    = $wp_query->is_tax       ?? false;
-        $original_is_cat    = $wp_query->is_category  ?? false;
-        $original_is_tag    = $wp_query->is_tag       ?? false;
+        $original_singular  = $has_query ? ( $wp_query->is_singular  ?? false ) : false;
+        $original_is_single = $has_query ? ( $wp_query->is_single    ?? false ) : false;
+        $original_is_page   = $has_query ? ( $wp_query->is_page      ?? false ) : false;
+        $original_is_arch   = $has_query ? ( $wp_query->is_archive   ?? false ) : false;
+        $original_is_tax    = $has_query ? ( $wp_query->is_tax       ?? false ) : false;
+        $original_is_cat    = $has_query ? ( $wp_query->is_category  ?? false ) : false;
+        $original_is_tag    = $has_query ? ( $wp_query->is_tag       ?? false ) : false;
 
         // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
         $GLOBALS['post'] = $post;
         setup_postdata( $post );
 
         // Force conditional tags to report the truth about the queried object.
-        $wp_query->is_singular = true;
-        $wp_query->is_single   = ( $post->post_type !== 'page' );
-        $wp_query->is_page     = ( $post->post_type === 'page' );
-        $wp_query->is_archive  = false;
-        $wp_query->is_tax      = false;
-        $wp_query->is_category = false;
-        $wp_query->is_tag      = false;
+        if ( $has_query ) {
+            $wp_query->is_singular = true;
+            $wp_query->is_single   = ( $post->post_type !== 'page' );
+            $wp_query->is_page     = ( $post->post_type === 'page' );
+            $wp_query->is_archive  = false;
+            $wp_query->is_tax      = false;
+            $wp_query->is_category = false;
+            $wp_query->is_tag      = false;
+        }
 
         try {
             $fn();
         } finally {
-            $wp_query->is_singular = $original_singular;
-            $wp_query->is_single   = $original_is_single;
-            $wp_query->is_page     = $original_is_page;
-            $wp_query->is_archive  = $original_is_arch;
-            $wp_query->is_tax      = $original_is_tax;
-            $wp_query->is_category = $original_is_cat;
-            $wp_query->is_tag      = $original_is_tag;
+            if ( $has_query ) {
+                $wp_query->is_singular = $original_singular;
+                $wp_query->is_single   = $original_is_single;
+                $wp_query->is_page     = $original_is_page;
+                $wp_query->is_archive  = $original_is_arch;
+                $wp_query->is_tax      = $original_is_tax;
+                $wp_query->is_category = $original_is_cat;
+                $wp_query->is_tag      = $original_is_tag;
+            }
 
             if ( $original_post instanceof WP_Post ) {
                 // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
@@ -457,8 +467,8 @@ class Ligase_Generator {
             'name'        => $name . ' — ' . wp_strip_all_tags( get_bloginfo( 'name' ) ),
             'inLanguage'  => str_replace( '_', '-', get_locale() ),
             'isPartOf'    => [ '@id' => home_url( '/#website' ) ],
-            'about'       => [ '@id' => home_url( '/#author-' . $author_id ) ],
-            'mainEntity'  => [ '@id' => home_url( '/#author-' . $author_id ) ],
+            'about'       => [ '@id' => Ligase_Type_BlogPosting::author_ref_id( (int) $author_id ) ],
+            'mainEntity'  => [ '@id' => Ligase_Type_BlogPosting::author_ref_id( (int) $author_id ) ],
         ];
 
         if ( $description ) {

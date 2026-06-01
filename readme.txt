@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.7
+Stable tag: 2.4.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,41 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.8 =
+**Multi-agent production audit — 14 bug fixes including 4 score-killer typos and 1 FPM state leak.**
+
+A full read-only audit by 4 parallel agents (settings integration / type classes / AJAX security / core pipeline) surfaced 35+ findings. This release fixes the 14 most production-critical. Detailed audit reports in `docs/audit-2025-06-01-*.md`.
+
+**Settings / data persistence (silent data loss):**
+* `default_schema_type` dropdown — was a ghost field (rendered, accepted choice, never saved). Added to sanitize() text_fields whitelist.
+* `health_report_enabled` checkbox — Turn ON worked via defaults merge, turn OFF never persisted. Added to sanitize() checkbox whitelist.
+
+**Score-killer typos (explains 0/100 across all sites):**
+* `Ligase_Score` was reading FOUR non-existent option keys: `organization_name` / `organization_logo` / `organization_knows_about` / `organization_same_as`. Real keys are `org_name` / `org_logo` / `knows_about` / aggregated from `social_*` fields. Score was permanently missing 30+ points on every site since plugin's first release. Fixed all 4 reads.
+* Three more ghost-key reads: `use_graph`, `enable_breadcrumb`, `enable_search_action` — none of these settings exist; the corresponding Ligase features (entity @graph, BreadcrumbList, SearchAction) are always-on. Hardcoded to `true` so score reflects reality.
+
+**Output correctness (Google can reject these):**
+* `WebSite.potentialAction.target` — `home_url()` was URL-encoding the `{search_term_string}` placeholder to `%7Bsearch_term_string%7D`, breaking the Sitelinks Search Box. Build the URL by string concat to preserve the literal braces.
+* `Organization.employee[]` — `get_users(has_published_posts => true)` is deprecated since WP 6.4 (expects array of post_types). Fixed + added 20-entry cap + post_count ordering so big sites don't dump 500-entry employee arrays into every page's JSON-LD.
+* `JobPosting.jobLocation.address.addressCountry` — `strtoupper(substr("Poland", 0, 2))` mangled human-readable country names to `"PO"`. Now validates as ISO 3166-1 alpha-2 (2 letters only) or drops the field.
+* `VideoObject` — emitted empty `thumbnailUrl` / `embedUrl` / `description` strings when manual meta was missing. Google flags this as invalid AND it's an SEO-spam signal ("we said we have a video, we don't"). Now: only emits fields with real values; returns empty array if essentials missing so Generator drops the node.
+* WC unknown stock status — previously defaulted to `https://schema.org/InStock` for unknown stock states (custom 'preorder', 'discontinued' added by 3rd-party plugins). Misleading-info = manual-action risk. Now returns null so the field is omitted, not lying.
+
+**Security / data leakage:**
+* Settings export (`handle_ligase_export_settings`) leaked the LLM API key (`ner_api_key`) and GSC service account JSON in plaintext. Now redacted to `__REDACTED__` in the exported file; re-import on the same site keeps live values (import has a whitelist that doesn't accept those keys anyway).
+
+**Fatal-error guards:**
+* `Generator::with_post_globals()` wrote `$wp_query->is_singular = true;` unconditionally. Fatals on AMP renderers / REST controllers / certain page builders that call `do_action('wp_head')` with a non-WP_Query global. Added `instanceof WP_Query` guard.
+* Generator had a duplicate `case 'blog_listing':` in the switch — second arm was unreachable. Linter / PHPStan reject. Cleaned up.
+* `Suppressor::is_active()` returned the legacy `private static bool $is_active` which could leak across requests in long-lived FPM workers with OPcache class-table persistence. Now reads `ligase_options.standalone_mode` directly every call.
+
+**Author @id integrity:**
+* `Ligase_Type_BlogPosting::author_ref_id()` extended to return `#org` not just for redakcja flag but ALSO when the author user doesn't exist (orphaned post). Eliminates dangling `#author-0` references in JSON-LD.
+* 7 other type classes (Review, QAPage, ClaimReview, ItemList, Generator profile_page + about/mainEntity) now route through `author_ref_id()` instead of constructing `#author-{id}` directly. Single source of truth for author entity resolution.
+
+**Polish/EU number formatting:**
+* Float/int sanitizers cast `"1 299,90 zł"` to `1.0` — a 1300× price misstatement. Now strips currency/spaces, normalises the last comma OR dot as decimal separator, treats earlier separators as thousands. `"1 299,90"` → `1299.9`, `"1.299,90"` → `1299.9`, `"1299"` → `1299`.
 
 = 2.4.7 =
 **Store tab not visible (2.4.6 ship bug) + 2 checkboxes silently never saved.**

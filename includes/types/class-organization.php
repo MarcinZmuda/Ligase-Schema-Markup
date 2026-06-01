@@ -80,15 +80,22 @@ class Ligase_Type_Organization {
             $schema['founder'] = [ '@id' => home_url( '/#author-' . $founder_id ) ];
         }
 
-        // employee — all published authors linked by @id
-        $authors = get_users( [
-            'has_published_posts' => true,
-            'fields'             => 'ID',
-        ] );
+        // employee — published authors linked by @id.
+        // `has_published_posts` expects an array of post_types since WP 6.4 (was boolean
+        // in 4.7+ but deprecated). Plus cap at 20 entries — a 500-author employee[] is
+        // payload bloat that helps no one and is cached for 12h.
+        $authors = get_users( array(
+            'has_published_posts' => array( 'post' ),
+            'fields'              => 'ID',
+            'number'              => 20,
+            'orderby'             => 'post_count',
+            'order'               => 'DESC',
+        ) );
         if ( ! empty( $authors ) ) {
-            $schema['employee'] = array_map( fn( $uid ) => [
-                '@id' => home_url( '/#author-' . $uid ),
-            ], $authors );
+            $schema['employee'] = array_values( array_map(
+                fn( $uid ) => [ '@id' => home_url( '/#author-' . (int) $uid ) ],
+                $authors
+            ) );
         }
 
         // Store-level merchant policies — emitted once, referenced from product Offers

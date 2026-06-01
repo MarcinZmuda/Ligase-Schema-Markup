@@ -571,9 +571,20 @@ class Ligase_Ajax {
 		try {
 			$options = get_option( 'ligase_options', array() );
 
+			// Redact secrets from the exported snapshot. Admins downloading "backup"
+			// would otherwise leak the LLM API key + GSC service account JSON to anyone
+			// they share the file with. Re-importing on the same site keeps the live
+			// values via the existing options row (import merges by key).
+			$redacted_keys = array( 'ner_api_key', 'gsc_service_account_json' );
+			foreach ( $redacted_keys as $rk ) {
+				if ( isset( $options[ $rk ] ) && $options[ $rk ] !== '' ) {
+					$options[ $rk ] = '__REDACTED__';
+				}
+			}
+
 			$authors = get_users(
 				array(
-					'has_published_posts' => true,
+					'has_published_posts' => array( 'post' ),
 					'fields'             => array( 'ID' ),
 				)
 			);

@@ -263,7 +263,7 @@ class Ligase_Score {
 		}
 
 		// 6. Publisher @id linking (10 pts).
-		$org_name = $this->options['organization_name'] ?? get_bloginfo( 'name' );
+		$org_name = $this->options['org_name'] ?? get_bloginfo( 'name' );
 		$passed   = ! empty( $org_name );
 		$check    = $this->make_check(
 			'post_publisher_id',
@@ -280,7 +280,8 @@ class Ligase_Score {
 		}
 
 		// 7. Breadcrumb present (5 pts).
-		$breadcrumb_enabled = ! empty( $this->options['enable_breadcrumb'] );
+		// BreadcrumbList is auto-emitted on every relevant page; no opt-out setting exists.
+		$breadcrumb_enabled = true;
 		$check              = $this->make_check(
 			'post_breadcrumb',
 			'Lista nawigacyjna (BreadcrumbList)',
@@ -812,7 +813,9 @@ class Ligase_Score {
 	 * @return array
 	 */
 	private function check_graph_linking(): array {
-		$use_graph = ! empty( $this->options['use_graph'] );
+		// Ligase always emits a consolidated @graph (no setting opts you out of it).
+		// Previously read a ghost `use_graph` key that was never written → always 0 pts.
+		$use_graph = true;
 
 		return $this->make_check(
 			'site_graph_linking',
@@ -830,10 +833,14 @@ class Ligase_Score {
 	 * @return array
 	 */
 	private function check_sameas_wikidata(): array {
-		$same_as = $this->options['organization_same_as'] ?? array();
-
-		if ( is_string( $same_as ) ) {
-			$same_as = array_filter( array_map( 'trim', explode( "\n", $same_as ) ) );
+		// Aggregate sameAs from the individual social_* settings — there's no single
+		// `organization_same_as` key, the older code path read a ghost option.
+		$same_as = array();
+		foreach ( array( 'social_wikidata', 'social_wikipedia', 'social_linkedin',
+		                 'social_facebook', 'social_twitter', 'social_youtube' ) as $key ) {
+			if ( ! empty( $this->options[ $key ] ) ) {
+				$same_as[] = (string) $this->options[ $key ];
+			}
 		}
 
 		$has_wikidata = false;
@@ -860,7 +867,7 @@ class Ligase_Score {
 	 * @return array
 	 */
 	private function check_knows_about(): array {
-		$knows_about = $this->options['organization_knows_about'] ?? '';
+		$knows_about = $this->options['knows_about'] ?? '';
 		$passed      = ! empty( $knows_about );
 
 		return $this->make_check(
@@ -977,7 +984,7 @@ class Ligase_Score {
 	 * @return array
 	 */
 	private function check_org_logo(): array {
-		$logo   = $this->options['organization_logo'] ?? '';
+		$logo   = $this->options['org_logo'] ?? '';
 		$passed = ! empty( $logo );
 
 		return $this->make_check(
@@ -996,15 +1003,14 @@ class Ligase_Score {
 	 * @return array
 	 */
 	private function check_breadcrumbs(): array {
-		$enabled = ! empty( $this->options['enable_breadcrumb'] );
-
+		// Ligase auto-emits BreadcrumbList — no setting controls it.
 		return $this->make_check(
 			'site_breadcrumbs',
 			'Lista nawigacyjna (BreadcrumbList)',
-			$enabled,
-			$enabled ? 5 : 0,
+			true,
 			5,
-			$enabled ? '' : 'Wlacz schemat BreadcrumbList w ustawieniach wtyczki.'
+			5,
+			''
 		);
 	}
 
@@ -1014,15 +1020,14 @@ class Ligase_Score {
 	 * @return array
 	 */
 	private function check_search_action(): array {
-		$enabled = ! empty( $this->options['enable_search_action'] );
-
+		// Ligase auto-emits SearchAction on WebSite — no setting controls it.
 		return $this->make_check(
 			'site_search_action',
 			'Akcja wyszukiwania (SearchAction)',
-			$enabled,
-			$enabled ? 5 : 0,
+			true,
 			5,
-			$enabled ? '' : 'Wlacz SearchAction w schemacie WebSite w ustawieniach wtyczki.'
+			5,
+			''
 		);
 	}
 
