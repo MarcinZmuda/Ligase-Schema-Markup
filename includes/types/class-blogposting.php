@@ -4,6 +4,34 @@ defined( 'ABSPATH' ) || exit;
 
 class Ligase_Type_BlogPosting {
 
+    /**
+     * Resolve which @id should appear in BlogPosting.author. Two override paths:
+     *
+     *   1. Site-wide `org_author_mode` setting → every post's author becomes
+     *      the OnlineStore/Organization node (`#org`). For redakcyjne sites
+     *      where individual WP accounts are workflow users, not real bylines.
+     *
+     *   2. Per-user `ligase_is_redakcja` meta → only this specific user is
+     *      treated as Organization. For mixed sites where most authors are
+     *      real people but one or two accounts represent a team byline like
+     *      "Redakcja MAKUMI" or "Sales Team".
+     *
+     * Both paths route the author to `#org` so the graph stays consistent:
+     * author = publisher = Organization. The corresponding Person node is
+     * suppressed in Ligase_Generator::add_blog_post_graph() (same flag check).
+     */
+    public static function author_ref_id( int $author_id ): string {
+        $opts = (array) get_option( 'ligase_options', array() );
+        if ( ! empty( $opts['org_author_mode'] ) ) {
+            return home_url( '/#org' );
+        }
+        if ( $author_id > 0 && get_user_meta( $author_id, 'ligase_is_redakcja', true ) === '1' ) {
+            return home_url( '/#org' );
+        }
+        return home_url( '/#author-' . $author_id );
+    }
+
+
     public function build(): ?array {
         if ( ! is_single() ) {
             return null;
@@ -33,7 +61,7 @@ class Ligase_Type_BlogPosting {
             'headline'           => $headline,
             'datePublished'      => get_the_date( 'c' ),
             'inLanguage'         => str_replace( '_', '-', get_locale() ),
-            'author'             => [ [ '@id' => home_url( '/#author-' . $author_id ) ] ],
+            'author'             => [ [ '@id' => Ligase_Type_BlogPosting::author_ref_id( $author_id ) ] ],
             'publisher'          => [ '@id' => home_url( '/#org' ) ],
             'isPartOf'           => [ '@id' => home_url( '/#website' ) ],
         ];

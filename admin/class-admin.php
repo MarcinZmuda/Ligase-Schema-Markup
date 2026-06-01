@@ -681,6 +681,10 @@ class Ligase_Admin {
 		// Each field carries its own input type + hint so a single render loop
 		// handles text / url / tel / textarea uniformly.
 		$fields = array(
+			// --- Author entity type (Person vs Organization for redakcja) ---
+			'ligase_is_redakcja'  => array( 'label' => __( 'Ten użytkownik to redakcja / zespół (Organization, NIE Person)', 'ligase' ), 'type' => 'checkbox',
+				'hint' => __( 'Zaznacz dla kont typu "Redakcja MAKUMI" / "Sales Team" — wpisy tego użytkownika dostaną author = Organization (#org), a osobny węzeł Person NIE zostanie wyemitowany. Wszystkie pola Person poniżej (givenName / hasCredential / itd.) są wtedy ignorowane.', 'ligase' ) ),
+
 			// --- Identity ---
 			'ligase_given_name'   => array( 'label' => __( 'Imię (givenName)', 'ligase' ), 'type' => 'text',
 				'hint' => __( 'Domyślnie z pola WP "Imię". Wpisz tylko jeśli display_name nie da się sensownie rozbić.', 'ligase' ) ),
@@ -845,11 +849,13 @@ class Ligase_Admin {
 			}
 		}
 
-		// Checkbox: ligase_publish_email
-		update_user_meta(
-			$user_id,
-			'ligase_publish_email',
-			isset( $_POST['ligase_publish_email'] ) && (string) $_POST['ligase_publish_email'] === '1' ? '1' : '0'
-		);
+		// Checkboxes — saved as '1' or '0' so the read-side checks behave consistently.
+		foreach ( array( 'ligase_publish_email', 'ligase_is_redakcja' ) as $cb_key ) {
+			update_user_meta(
+				$user_id,
+				$cb_key,
+				isset( $_POST[ $cb_key ] ) && (string) $_POST[ $cb_key ] === '1' ? '1' : '0'
+			);
+		}
 	}
 }

@@ -154,7 +154,12 @@ class Ligase_Generator {
             $author_id = (int) $post->post_author;
 
             $graph[] = ( new Ligase_Type_BlogPosting() )->build();
-            $graph[] = ( new Ligase_Type_Person( $author_id ) )->build();
+            // Skip the Person node when this author is mapped to the Organization
+            // (org_author_mode site-wide flag, or per-user ligase_is_redakcja meta).
+            // BlogPosting.author already points at #org in that case.
+            if ( ! $this->author_is_organization( $author_id ) ) {
+                $graph[] = ( new Ligase_Type_Person( $author_id ) )->build();
+            }
             $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
 
             foreach ( $this->get_optional_types() as $type ) {
@@ -167,6 +172,21 @@ class Ligase_Generator {
     }
 
     /**
+     * True when the author should be represented as the site Organization
+     * rather than a Person — controls Person-node suppression in the graph.
+     */
+    private function author_is_organization( int $author_id ): bool {
+        $opts = (array) get_option( 'ligase_options', array() );
+        if ( ! empty( $opts['org_author_mode'] ) ) {
+            return true;
+        }
+        if ( $author_id > 0 && get_user_meta( $author_id, 'ligase_is_redakcja', true ) === '1' ) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Single CPT (product, recipe, jobposting, custom CPT etc.).
      */
     private function add_cpt_single_graph( array &$graph, WP_Post $post ): void {
@@ -174,7 +194,9 @@ class Ligase_Generator {
             $author_id = (int) $post->post_author;
 
             $graph[] = $this->build_webpage();
-            $graph[] = ( new Ligase_Type_Person( $author_id ) )->build();
+            if ( ! $this->author_is_organization( $author_id ) ) {
+                $graph[] = ( new Ligase_Type_Person( $author_id ) )->build();
+            }
             $graph[] = ( new Ligase_Type_BreadcrumbList() )->build();
 
             foreach ( $this->get_optional_types() as $type ) {

@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.5
+Stable tag: 2.4.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,19 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.6 =
+**Store / E-commerce settings UI + Organization-as-author (Redakcja) mode wired.**
+
+* **`Ligase → Ustawienia → Store / E-commerce`** — nowa sekcja w panelu ustawień z 10 polami zasilającymi site-level merchant policies (włącznie z `returnPolicyCountry` wymaganym przez Google od marca 2025):
+  - Włącz tryb OnlineStore (checkbox)
+  - Waluta (ISO 4217) — auto-uppercase, 3 znaki
+  - Polityka zwrotów — kraj (ISO 3166-1 alpha-2), dni, opłaty (dropdown z 4 enum'ami schema.org: FreeReturn / ReturnFeesCustomerResponsibility / ReturnShippingFees / RestockingFees)
+  - Wysyłka — kraj docelowy, stawka (0 = darmowa), handling time min/max, transit time min/max
+  - Wszystkie pola sanityzowane do ISO-format gdzie trzeba; pusty input = nie emituj (graceful degradation).
+* **`org_author_mode` site-wide flag** podpięta do generatora i BlogPosting. Wcześniej była w UI ale **nic nie robiła**. Teraz gdy ON: każdy post emituje `author: { "@id": "#org" }`, węzeł Person jest pomijany. Idealne dla blogów redakcyjnych / firmowych gdzie konta WP są techniczne, nie reprezentują realnych bylinów.
+* **Per-user `ligase_is_redakcja` toggle** — nowy checkbox w profilu autora ("Ten użytkownik to redakcja / zespół"). Pozwala na **mieszany site** gdzie 95% autorów to realne osoby (Person), a 1-2 konta to byliny zespołowe (Organization). Per-user override działa niezależnie od globalnego org_author_mode.
+* Oba mechanizmy spinają `author = publisher = #org` w grafie. AI Overviews + LLMs traktują ten sygnał lepiej niż fake Person z minimalnymi polami.
 
 = 2.4.5 =
 **Posty page: filter post_type/flag + flags column + auditor "Standalone aktywny" status fix + 2.4.4 auditor type-aware.**

@@ -34,6 +34,7 @@ class Ligase_Settings {
 	const SECTION_SOCIAL   = 'ligase_section_social';
 	const SECTION_BEHAVIOR = 'ligase_section_behavior';
 	const SECTION_LOCAL    = 'ligase_section_local_business';
+	const SECTION_STORE    = 'ligase_section_store';
 
 	/**
 	 * Register settings, sections, and fields. Called from admin_init.
@@ -120,6 +121,29 @@ class Ligase_Settings {
 		self::add_field( 'lb_area_served',  __( 'Obsługiwany obszar', 'ligase' ),                                             self::SECTION_LOCAL, 'text' );
 		self::add_field( 'lb_hours',        __( 'Godziny otwarcia', 'ligase' ),                                           self::SECTION_LOCAL, 'lb_hours' );
 
+		// Store / E-commerce section — site-level merchant return policy + shipping
+		// emitted once on the Organization (OnlineStore) node. Product Offers reference
+		// these via @id, drastically cutting JSON-LD payload across large catalogs.
+		add_settings_section(
+			self::SECTION_STORE,
+			__( 'Store / E-commerce (OnlineStore + Merchant Listing)', 'ligase' ),
+			array( __CLASS__, 'render_store_section_desc' ),
+			'ligase-ustawienia'
+		);
+		self::add_field( 'store_mode',             __( 'Włącz tryb OnlineStore', 'ligase' ),                          self::SECTION_STORE, 'checkbox' );
+		self::add_field( 'store_currency',         __( 'Waluta (ISO 4217)', 'ligase' ),                                self::SECTION_STORE, 'text' );
+
+		self::add_field( 'store_return_country',   __( 'Polityka zwrotów — kraj (ISO 3166-1 alpha-2, np. PL)', 'ligase' ), self::SECTION_STORE, 'text' );
+		self::add_field( 'store_return_days',      __( 'Polityka zwrotów — dni', 'ligase' ),                          self::SECTION_STORE, 'number' );
+		self::add_field( 'store_return_fees',      __( 'Polityka zwrotów — opłaty', 'ligase' ),                       self::SECTION_STORE, 'return_fees_select' );
+
+		self::add_field( 'store_shipping_country', __( 'Wysyłka — kraj docelowy (ISO 3166-1)', 'ligase' ),             self::SECTION_STORE, 'text' );
+		self::add_field( 'store_shipping_rate',    __( 'Wysyłka — stawka (0 = darmowa)', 'ligase' ),                   self::SECTION_STORE, 'text' );
+		self::add_field( 'store_handling_min',     __( 'Wysyłka — handling time (dni, min)', 'ligase' ),               self::SECTION_STORE, 'number' );
+		self::add_field( 'store_handling_max',     __( 'Wysyłka — handling time (dni, max)', 'ligase' ),               self::SECTION_STORE, 'number' );
+		self::add_field( 'store_transit_min',      __( 'Wysyłka — transit time (dni, min)', 'ligase' ),                self::SECTION_STORE, 'number' );
+		self::add_field( 'store_transit_max',      __( 'Wysyłka — transit time (dni, max)', 'ligase' ),                self::SECTION_STORE, 'number' );
+
 		// NER API section
 		add_settings_section( 'ligase_ner_section', __( 'AI Entity Detection (NER)', 'ligase' ), array( __CLASS__, 'render_ner_section_desc' ), 'ligase-ustawienia' );
 		self::add_field( 'ner_provider', __( 'AI Provider', 'ligase' ), 'ligase_ner_section', 'ner_select' );
@@ -185,12 +209,13 @@ class Ligase_Settings {
 	 */
 	private static function add_field( $id, $title, $section, $type ) {
 		$callback = match( $type ) {
-			'checkbox'   => array( __CLASS__, 'render_checkbox' ),
-			'ner_select' => array( __CLASS__, 'render_ner_select' ),
+			'checkbox'           => array( __CLASS__, 'render_checkbox' ),
+			'ner_select'         => array( __CLASS__, 'render_ner_select' ),
 			'schema_type_select' => array( __CLASS__, 'render_schema_type_select' ),
-			'lb_select'  => array( __CLASS__, 'render_lb_type_select' ),
-			'lb_hours'   => array( __CLASS__, 'render_lb_hours' ),
-			default      => array( __CLASS__, 'render_field' ),
+			'lb_select'          => array( __CLASS__, 'render_lb_type_select' ),
+			'lb_hours'           => array( __CLASS__, 'render_lb_hours' ),
+			'return_fees_select' => array( __CLASS__, 'render_return_fees_select' ),
+			default              => array( __CLASS__, 'render_field' ),
 		};
 
 		add_settings_field(
@@ -246,6 +271,47 @@ class Ligase_Settings {
 	// =========================================================================
 	// LocalBusiness render methods
 	// =========================================================================
+
+	public static function render_store_section_desc(): void {
+		echo '<div style="margin:8px 0;padding:12px 16px;background:#FFF7ED;border-left:4px solid #F97316;border-radius:4px;">';
+		echo '<strong>&#x1F6D2; ' . esc_html__( 'Store / Merchant Listing', 'ligase' ) . '</strong><br>';
+		echo esc_html__( 'Wypełnij gdy prowadzisz sklep WooCommerce. Polityka zwrotów i wysyłki zostanie wyemitowana RAZ na poziomie Organization (jako OnlineStore), a każdy produkt będzie się do niej odwoływał przez @id. Dramatycznie zmniejsza payload JSON-LD przy dużych katalogach i jest wymagana przez Google od marca 2025 dla merchant listings (Popular Products, Shopping carousel, "Darmowa dostawa" badge).', 'ligase' );
+		echo '<br><br>';
+		echo '<strong>' . esc_html__( 'returnPolicyCountry jest WYMAGANE.', 'ligase' ) . '</strong> ';
+		echo esc_html__( 'Bez kodu kraju (PL / DE / US) Google wycofuje produkt z merchant listing.', 'ligase' );
+		echo '<br><small style="color:#6B7280;">';
+		echo esc_html__( 'WooCommerce aktywne? Tryb OnlineStore włącza się też automatycznie — pola tutaj uzupełniają polityki które klasa Organization auto-promuje.', 'ligase' );
+		echo '</small></div>';
+	}
+
+	/**
+	 * Return fees select — Google's enum of accepted return-fee values.
+	 */
+	public static function render_return_fees_select( $args ): void {
+		$options  = get_option( self::KEY, self::defaults() );
+		$current  = (string) ( $options[ $args['id'] ] ?? 'FreeReturn' );
+		$field_id = 'ligase_field_' . $args['id'];
+		$name     = self::KEY . '[' . $args['id'] . ']';
+
+		$values = array(
+			'FreeReturn'                         => __( 'FreeReturn — darmowy zwrot (klient nic nie płaci)', 'ligase' ),
+			'ReturnFeesCustomerResponsibility'   => __( 'ReturnFeesCustomerResponsibility — klient pokrywa koszt', 'ligase' ),
+			'ReturnShippingFees'                 => __( 'ReturnShippingFees — koszt tylko za przesyłkę zwrotną', 'ligase' ),
+			'RestockingFees'                     => __( 'RestockingFees — opłata restock', 'ligase' ),
+		);
+
+		echo '<select id="' . esc_attr( $field_id ) . '" name="' . esc_attr( $name ) . '">';
+		foreach ( $values as $v => $label ) {
+			printf(
+				'<option value="%s" %s>%s</option>',
+				esc_attr( $v ),
+				selected( $current, $v, false ),
+				esc_html( $label )
+			);
+		}
+		echo '</select>';
+		echo '<p class="description">' . esc_html__( 'Tylko z 4 dozwolonych wartości schema.org/MerchantReturnPolicy.', 'ligase' ) . '</p>';
+	}
 
 	public static function render_local_business_section_desc(): void {
 		echo '<div style="margin:8px 0;padding:12px 16px;background:#F0FDF4;border-left:4px solid #10B981;border-radius:4px;">';
@@ -530,6 +596,10 @@ class Ligase_Settings {
 			'lb_type', 'lb_name', 'lb_description',
 			'lb_street', 'lb_city', 'lb_region', 'lb_postal', 'lb_country',
 			'lb_lat', 'lb_lng', 'lb_price_range', 'lb_area_served',
+			// Store / e-commerce — text-shape values (the ISO codes are
+			// re-validated below for length + case).
+			'store_currency', 'store_return_country', 'store_return_fees',
+			'store_shipping_country', 'store_shipping_rate',
 		);
 		foreach ( $text_fields as $key ) {
 			if ( isset( $input[ $key ] ) ) {
@@ -559,15 +629,45 @@ class Ligase_Settings {
 		}
 
 		// Numbers
-		foreach ( array( 'logo_width', 'logo_height' ) as $key ) {
+		foreach ( array(
+			'logo_width', 'logo_height',
+			'store_return_days', 'store_handling_min', 'store_handling_max',
+			'store_transit_min', 'store_transit_max',
+		) as $key ) {
 			if ( isset( $input[ $key ] ) ) {
 				$clean[ $key ] = absint( $input[ $key ] );
 			}
 		}
 
 		// Checkboxes
-		foreach ( array( 'standalone_mode', 'force_output', 'debug_mode' ) as $key ) {
+		foreach ( array( 'standalone_mode', 'force_output', 'debug_mode', 'store_mode' ) as $key ) {
 			$clean[ $key ] = ! empty( $input[ $key ] ) ? '1' : '';
+		}
+
+		// ISO country code normalization — store_return_country + store_shipping_country
+		// must be 2-letter uppercase. Empty value = clear (not stored).
+		foreach ( array( 'store_return_country', 'store_shipping_country' ) as $country_key ) {
+			if ( isset( $clean[ $country_key ] ) && $clean[ $country_key ] !== '' ) {
+				$c = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) $clean[ $country_key ] ) );
+				$clean[ $country_key ] = strlen( $c ) === 2 ? $c : '';
+			}
+		}
+		// Currency — 3-letter uppercase (PLN / EUR / USD).
+		if ( isset( $clean['store_currency'] ) && $clean['store_currency'] !== '' ) {
+			$cur = strtoupper( preg_replace( '/[^A-Za-z]/', '', (string) $clean['store_currency'] ) );
+			$clean['store_currency'] = strlen( $cur ) === 3 ? $cur : '';
+		}
+		// store_return_fees — whitelist Google's enum
+		if ( isset( $clean['store_return_fees'] ) ) {
+			$allowed_fees = array( 'FreeReturn', 'ReturnFeesCustomerResponsibility', 'ReturnShippingFees', 'RestockingFees' );
+			if ( ! in_array( $clean['store_return_fees'], $allowed_fees, true ) ) {
+				$clean['store_return_fees'] = 'FreeReturn';
+			}
+		}
+		// store_shipping_rate — accept float (with comma OR dot decimal)
+		if ( isset( $clean['store_shipping_rate'] ) ) {
+			$rate = str_replace( ',', '.', (string) $clean['store_shipping_rate'] );
+			$clean['store_shipping_rate'] = is_numeric( $rate ) ? (string) (float) $rate : '';
 		}
 
 		// Opening hours — nested array sanitize
