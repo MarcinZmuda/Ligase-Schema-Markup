@@ -416,12 +416,44 @@ class Ligase_Auditor {
 			);
 		}
 
-		// Score the first (primary) schema block.
-		$schema        = $schema_blocks[0];
+		// Choose the schema node most relevant to this post type. After unwrapping
+		// the @graph envelope, schema_blocks can contain WebSite / Organization /
+		// BlogPosting / Person / BreadcrumbList for a single blog post — only the
+		// BlogPosting (or Product / WebPage) is the right thing to score.
+		$post_type = get_post_type( $post_id );
+		if ( $post_type === 'product' ) {
+			$priority = array( 'Product' );
+		} elseif ( $post_type === 'page' ) {
+			$priority = array( 'AboutPage', 'ContactPage', 'CheckoutPage', 'CollectionPage', 'FAQPage', 'WebPage' );
+		} else {
+			$priority = array( 'BlogPosting', 'Article', 'NewsArticle' );
+		}
+
+		$schema = null;
+		foreach ( $priority as $wanted ) {
+			foreach ( $schema_blocks as $block ) {
+				$type = $block['@type'] ?? '';
+				if ( is_string( $type ) && $type === $wanted ) {
+					$schema = $block;
+					break 2;
+				}
+				if ( is_array( $type ) && in_array( $wanted, $type, true ) ) {
+					$schema = $block;
+					break 2;
+				}
+			}
+		}
+		if ( $schema === null ) {
+			$schema = $schema_blocks[0];
+		}
+
 		$current_score = $this->score( $schema );
 		$issues        = $this->collect_issues( $schema );
 		$source_plugin = $this->detect_source_plugin( $schema );
 		$schema_type   = $schema['@type'] ?? 'Unknown';
+		if ( is_array( $schema_type ) ) {
+			$schema_type = (string) reset( $schema_type );
+		}
 
 		Ligase_Logger::info(
 			sprintf( 'Scanned post %d: score %d, type %s, source %s.', $post_id, $current_score, $schema_type, $source_plugin ?: 'unknown' )
@@ -1132,10 +1164,26 @@ class Ligase_Auditor {
 
 		foreach ( $matches[1] as $json_str ) {
 			$decoded = json_decode( trim( $json_str ), true );
-
-			if ( json_last_error() === JSON_ERROR_NONE && is_array( $decoded ) ) {
-				$schemas[] = $decoded;
+			if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $decoded ) ) {
+				continue;
 			}
+
+			// Ligase (and Yoast / RankMath / AIOSEO) emit a single <script> containing
+			// one {"@context": "schema.org", "@graph": [...nodes...]} envelope. The
+			// scorer below expects per-node entries — without unwrapping @graph we'd
+			// read the envelope as one schema with no @type and no fields, and every
+			// post would score 0 because none of headline / datePublished / image /
+			// author live on the envelope itself.
+			if ( isset( $decoded['@graph'] ) && is_array( $decoded['@graph'] ) ) {
+				foreach ( $decoded['@graph'] as $node ) {
+					if ( is_array( $node ) ) {
+						$schemas[] = $node;
+					}
+				}
+				continue;
+			}
+
+			$schemas[] = $decoded;
 		}
 
 		return $schemas;

@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.16
+Stable tag: 2.4.17
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,19 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.17 =
+**Audytor: 0/100 dla wszystkich postów (był to bug audytora, nie schemy).**
+
+Symptom: panel "Skanowanie i naprawa" pokazywał Score = 0 dla wszystkich 176 postów makumi.eu, mimo że Rich Results Test ich produktów i artykułów był zielony.
+
+Bug w `Ligase_Auditor::get_jsonld_for_post()`: parsowanie pierwszego `<script type="application/ld+json">` z `wp_head` zwracało top-level **envelope** `{"@context": "schema.org/", "@graph": [...]}`. Scorer patrzył na `$schema['headline']` / `$schema['@type']` / `$schema['author']` — których na envelope NIE MA (one są wewnątrz `@graph` w poszczególnych węzłach). Wynik: "Brak headline, Brak datePublished, Brak author..." dla każdego postu.
+
+Naprawione:
+* `get_jsonld_for_post()` rozpakowuje `@graph` — każdy węzeł trafia jako osobny schema block do scorer'a.
+* `scan_post()` wybiera relevantny węzeł do oceny zamiast pierwszego: dla `post_type=product` → `Product`, dla `page` → `AboutPage`/`ContactPage`/`WebPage`/etc., dla `post` → `BlogPosting`/`Article`/`NewsArticle`. Fallback do pierwszego węzła gdy nie znajdzie target type.
+
+Po wgraniu kliknij "Uruchom audyt" ponownie — Score powinien skoczyć z 0 do realnych 40-90 dla większości postów.
 
 = 2.4.16 =
 **ItemList Karuzele: usunięto duplikat `url` + dodano `@id` per-Offer (ostatnie 2 critical Rich Results errors).**
