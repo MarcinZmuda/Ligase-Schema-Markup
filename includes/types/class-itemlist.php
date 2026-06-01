@@ -169,10 +169,16 @@ class Ligase_Type_ItemList {
             return null;
         }
 
+        // ListItem has TWO mutually exclusive shapes in schema.org:
+        //   1. Short:  { position, url, name }                    — link-only carousel
+        //   2. Full:   { position, item: { ...full entity... } }  — embedded Product/Article
+        // Mixing them (url AND item) triggers Google's "wykluczające się właściwości"
+        // critical error, AND repeats the URL once on ListItem and once inside item.url
+        // — "identyczne wartości właściwości". Emit only the full shape when we have
+        // an embeddable entity, otherwise fall back to the link-only shape.
         $item = array(
             '@type'    => 'ListItem',
             'position' => $position,
-            'url'      => esc_url( $url ),
         );
 
         if ( $context['query_post_type'] === 'product' && function_exists( 'wc_get_product' ) ) {
@@ -183,8 +189,17 @@ class Ligase_Type_ItemList {
             }
         }
 
-        // Article-shaped item (post / cpt)
-        $item['item'] = $this->build_inline_article( $post, $url, $name );
+        // Article-shaped embedded entity (post / cpt) — Google parses this as
+        // a richer carousel slot than the link-only fallback.
+        $embedded = $this->build_inline_article( $post, $url, $name );
+        if ( ! empty( $embedded ) ) {
+            $item['item'] = $embedded;
+            return $item;
+        }
+
+        // Last-resort link-only shape.
+        $item['url']  = esc_url( $url );
+        $item['name'] = $name;
         return $item;
     }
 

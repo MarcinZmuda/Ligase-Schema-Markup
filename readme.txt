@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.14
+Stable tag: 2.4.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,25 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.15 =
+**ItemList: wykluczające się właściwości + duplikat url (CRITICAL Rich Results error).**
+
+Karuzela kategorii makumi.eu (`/kategoria/koldry-obciazeniowe/`) zgłaszała 3 krytyczne błędy:
+* "Podano identyczne wartości właściwości, a muszą one być niepowtarzalne" (×2)
+* "W jednym elemencie uporządkowanych danych użyto co najmniej dwóch wykluczających się wzajemnie właściwości"
+
+Przyczyna: `build_list_item()` emitował JEDNOCZEŚNIE:
+* `url` na poziomie ListItem
+* `item` z pełnym Product / Article który **też** miał `url`
+
+Schema.org dopuszcza tylko JEDNĄ z dwóch form:
+* **Short**: `{ position, url, name }` — carousel z linkami
+* **Full**:  `{ position, item: { ...pełna entity... } }` — embedded Product/Article
+
+Mieszanie obu = `url` na ListItem i `item.url` to ta sama wartość → "identyczne wartości". I forma short + full razem → "wykluczające się właściwości".
+
+Naprawiono: gdy budujemy `item` (Product lub Article) — nie emitujemy `url`/`name` na poziomie ListItem. Tylko gdy żadnej embedded entity nie da się zbudować → fallback do short shape.
 
 = 2.4.14 =
 **Tabbed settings persist + Article image fallback + scrubber rozszerzony na Article/Product/wszystkie typy.**
