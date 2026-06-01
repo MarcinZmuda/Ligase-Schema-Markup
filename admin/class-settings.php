@@ -562,7 +562,14 @@ class Ligase_Settings {
 			'org_author_mode' => __( 'Włącz gdy posty nie mają konkretnego autora — np. redakcja, ghost writing. Ligase użyje Organizacji jako autora zamiast konta WordPress.', 'ligase' ),
 		);
 
+		// Hidden input BEFORE the checkbox: marks that this checkbox was present on the
+		// submitted sub-form, even when unchecked. PHP's $_POST keeps the LAST value for
+		// duplicated names, so checked → "1", unchecked → "" (hidden), absent tab → no key.
+		// Without this, switching to another tab and saving wiped every checkbox in tabs
+		// the user wasn't looking at, because sanitize() couldn't tell "unchecked here"
+		// from "not on this form at all".
 		printf(
+			'<input type="hidden" name="%2$s[%3$s]" value="" />' .
 			'<input type="checkbox" id="%1$s" name="%2$s[%3$s]" value="1" %4$s />',
 			esc_attr( 'ligase_field_' . $id ),
 			esc_attr( self::KEY ),
@@ -640,11 +647,14 @@ class Ligase_Settings {
 			}
 		}
 
-		// Checkboxes — must include EVERY checkbox field added via add_field('checkbox')
-		// or the value silently never gets saved (WP Settings API issue with sanitize()
-		// starting from defaults: untouched keys are reset, AND missing checkbox input
-		// from a partial POST defaults to empty string). When you add a new checkbox
-		// elsewhere, ALWAYS append the key here too — there's no automatic detection.
+		// Checkboxes — list every checkbox field added via add_field('checkbox') so
+		// per-tab submits know which keys are "on this tab" vs. "in a different tab".
+		// render_checkbox() emits a hidden input with empty value before each box,
+		// so a submitted-but-unchecked checkbox lands in $input as ''. A checkbox
+		// that lives in a tab the user wasn't viewing has NO key in $input at all —
+		// in that case we keep the current saved value (already merged into $clean).
+		// Without this guard, saving the "Behavior" tab wiped store_mode /
+		// org_author_mode / lb_service_area / health_report_enabled.
 		foreach ( array(
 			'standalone_mode',
 			'force_output',
@@ -652,8 +662,11 @@ class Ligase_Settings {
 			'store_mode',
 			'org_author_mode',
 			'lb_service_area',
-			'health_report_enabled',  // ← was ghost: turning ON merged via defaults but turning OFF never persisted
+			'health_report_enabled',
 		) as $key ) {
+			if ( ! array_key_exists( $key, $input ) ) {
+				continue;
+			}
 			$clean[ $key ] = ! empty( $input[ $key ] ) ? '1' : '';
 		}
 

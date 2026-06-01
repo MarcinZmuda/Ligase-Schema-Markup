@@ -250,8 +250,15 @@ class Ligase_Suppressor {
      */
     public static function dedupe_breadcrumb_jsonld( string $html ): string {
         $pattern = '#<script\b[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>#is';
-        $kept_ligase = false;
-        return (string) preg_replace_callback( $pattern, function ( array $m ) use ( &$kept_ligase ) {
+        $kept_breadcrumb = false;
+        // Schema types we'll dedupe when emitted as a standalone (non-@graph) node
+        // by a foreign theme/plugin. Ligase emits all these inside its @graph block,
+        // never as standalones, so any standalone here is competition.
+        $deduped_types = array(
+            'BreadcrumbList', 'Article', 'BlogPosting', 'NewsArticle', 'WebPage',
+            'WebSite', 'Organization', 'Product', 'FAQPage', 'HowTo', 'Recipe',
+        );
+        return (string) preg_replace_callback( $pattern, function ( array $m ) use ( &$kept_breadcrumb, $deduped_types ) {
             $body = trim( $m[1] );
             $data = json_decode( $body, true );
             if ( ! is_array( $data ) ) {
@@ -261,19 +268,26 @@ class Ligase_Suppressor {
             if ( isset( $data['@graph'] ) ) {
                 return $m[0];
             }
-            // Inline single-node BreadcrumbList
-            if ( isset( $data['@type'] ) && $data['@type'] === 'BreadcrumbList' ) {
-                $id = (string) ( $data['@id'] ?? '' );
-                $is_ligase = $id !== '' && substr( $id, -11 ) === '#breadcrumb';
-                if ( $is_ligase && ! $kept_ligase ) {
-                    $kept_ligase = true;
-                    return $m[0];
+            // Inline single-node typed entity.
+            if ( isset( $data['@type'] ) && is_string( $data['@type'] ) ) {
+                // BreadcrumbList — keep first Ligase one (id #breadcrumb), drop the rest.
+                if ( $data['@type'] === 'BreadcrumbList' ) {
+                    $id = (string) ( $data['@id'] ?? '' );
+                    $is_ligase = $id !== '' && substr( $id, -11 ) === '#breadcrumb';
+                    if ( $is_ligase && ! $kept_breadcrumb ) {
+                        $kept_breadcrumb = true;
+                        return $m[0];
+                    }
+                    return '';
                 }
-                // Either: duplicate of Ligase BreadcrumbList, or a theme/plugin
-                // BreadcrumbList we don't recognise. In standalone_mode we drop.
-                return '';
+                // Other duped types — if a standalone-typed node is a Ligase type that
+                // we always emit inside our @graph, anything ELSE outside the graph
+                // is by definition a foreign duplicate. Strip in standalone_mode.
+                if ( in_array( $data['@type'], $deduped_types, true ) ) {
+                    return '';
+                }
             }
-            // Any other single-type node passes through.
+            // Untyped or unrecognised node — leave alone (safer than over-stripping).
             return $m[0];
         }, $html );
     }

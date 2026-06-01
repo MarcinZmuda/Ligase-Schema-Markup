@@ -309,16 +309,31 @@ class Ligase_Type_BlogPosting {
         $orig_height = (int) ( $full[2] ?? 0 );
 
         // Google's minimum for rich results is 696px; recommendation for Top Stories /
-        // Discover is 1200px. We require 1200 so the variants below can be true crops.
+        // Discover is 1200px. We previously returned [] for under 1200 — meaning posts
+        // with smaller featured images shipped Article schema with NO image, which
+        // Google flags as "Brakujące pole image (opcjonalnie)". Emit the original as
+        // a single ImageObject instead — beats omitting the property entirely.
         if ( $orig_width < 1200 || $orig_height < 675 ) {
             if ( class_exists( 'Ligase_Logger' ) ) {
-                Ligase_Logger::warning( 'Featured image too small for Article ratios — needs ≥ 1200×675', [
+                Ligase_Logger::warning( 'Featured image below Article variant threshold (1200×675); emitting original only', [
                     'post_id' => $post_id,
                     'width'   => $orig_width,
                     'height'  => $orig_height,
                 ] );
             }
-            return [];
+            // Below 696px is below Google's hard minimum — skip rather than emit junk.
+            if ( $orig_width < 696 ) {
+                return [];
+            }
+            return array(
+                array(
+                    '@type'  => 'ImageObject',
+                    '@id'    => esc_url( get_permalink( $post_id ) ) . '#primaryimage',
+                    'url'    => esc_url( (string) $full[0] ),
+                    'width'  => $orig_width,
+                    'height' => $orig_height,
+                ),
+            );
         }
 
         // Optional license / credit metadata (per-post overrides global defaults).

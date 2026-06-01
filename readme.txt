@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.13
+Stable tag: 2.4.14
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,27 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.14 =
+**Tabbed settings persist + Article image fallback + scrubber rozszerzony na Article/Product/wszystkie typy.**
+
+**Tabbed settings: zapis jednej zakładki zerował checkboxy z innych zakładek.**
+
+Krytyczna regresja UX widoczna w 2.4.x. Settings ma tabbed UI gdzie KAŻDA zakładka renderuje TYLKO swoje sekcje, ale wszystkie tab'y dzielą jeden `<form>`. Submit z jednej tab'y wysyłał tylko swoje pola — `$_POST['ligase_options']` nie zawierał kluczy z innych tab'ów.
+
+Pętla checkboxów w sanitize() bezwarunkowo zapisywała `$clean[$key] = ! empty($input[$key]) ? '1' : ''` dla każdego znanego checkboxa → kasowała `store_mode` / `org_author_mode` / `lb_service_area` / itd. gdy user był w innej tab'ie.
+
+Symptom: user zaznaczał "Włącz tryb OnlineStore" w Store, klikał Save w innej zakładce → odznaczał się Store, vice versa.
+
+Naprawa dwuczęściowa:
+1. `render_checkbox()` emituje **hidden input z `value=""`** PRZED każdym `<input type="checkbox">` o tej samej `name`. PHP $_POST trzyma OSTATNIĄ wartość — checked → `"1"`, unchecked → `""`, brak na tabie → klucz w ogóle nie istnieje w `$input`.
+2. `sanitize()` używa `array_key_exists($key, $input)` zamiast bezwarunkowego nadpisania. Klucze których nie ma w `$input` (czyli inne zakładki) zachowują obecną wartość z merge'a z current options.
+
+Bez tego nie da się zapisać ustawień w pełni — każdy save jednej tab'i tracił dane z innych.
+
+**Article: brakujące pole image dla postów z mniejszym featured image.** `build_images()` w BlogPosting wymagało ≥ 1200×675px — dla mniejszych zwracało `[]`, czyli Article emitował się BEZ `image` w ogóle. Google flag'ował "Brakujące pole image (opcjonalnie)". Teraz: zachowano logikę 3-ratio variantów dla ≥ 1200×675, ale dla 696-1199 emituje pojedynczy ImageObject z oryginałem (lepsze niż puste). Poniżej 696 (Google's hard min) nadal nie emituje.
+
+**Scrubber rozszerzony.** Output-buffer scrubber z 2.4.13 dedupowal tylko BreadcrumbList. Powiększony o resztę typów które Ligase zawsze emituje wewnątrz `@graph`: Article / BlogPosting / NewsArticle / WebPage / WebSite / Organization / Product / FAQPage / HowTo / Recipe. Każdy standalone JSON-LD script z tymi typami = obca kopia z theme'a → wycina. Aktywne tylko w `standalone_mode`. Eliminuje duplikat Article widoczny na XStore / Flatsome / Woodmart / inne WooCommerce theme'y.
 
 = 2.4.13 =
 **Organization-level MerchantReturnPolicy: refundType + returnShippingFeesAmount + output-buffer BreadcrumbList dedupe.**
