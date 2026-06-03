@@ -177,8 +177,60 @@ class Ligase_Type_Person {
             ];
         }
 
-        // worksFor — graph-linked to Organization (always present in graph)
-        $schema['worksFor'] = [ '@id' => home_url( '/#org' ) ];
+        // worksFor — by default graph-linked to the site Organization, but authors
+        // who run their own firm (kancelaria / consulting) can override with an
+        // external Organization. Without override, the @id reference saves payload
+        // and consolidates the publisher entity across the graph.
+        $ext_works_name = (string) get_user_meta( $this->user_id, 'ligase_works_for_name', true );
+        $ext_works_url  = (string) get_user_meta( $this->user_id, 'ligase_works_for_url',  true );
+        if ( $ext_works_name !== '' ) {
+            $works_for = [
+                '@type' => 'Organization',
+                'name'  => wp_strip_all_tags( $ext_works_name ),
+            ];
+            if ( $ext_works_url !== '' ) {
+                $works_for['url'] = esc_url( $ext_works_url );
+            }
+            $schema['worksFor'] = $works_for;
+        } else {
+            $schema['worksFor'] = [ '@id' => home_url( '/#org' ) ];
+        }
+
+        // affiliation — loose ties (industry associations, advisory boards) where
+        // the person isn't a formal member. Schema.org distinguishes memberOf
+        // (formal membership) from affiliation (cooperation / association).
+        $affiliation_raw = (string) get_user_meta( $this->user_id, 'ligase_affiliation', true );
+        $affiliation     = $this->parse_member_of( $affiliation_raw );
+        if ( ! empty( $affiliation ) ) {
+            $schema['affiliation'] = count( $affiliation ) === 1 ? $affiliation[0] : $affiliation;
+        }
+
+        // subjectOf — external articles / interviews where this person is the topic.
+        // Strong Knowledge Graph signal: "this entity is written about by these
+        // independent publications." Format per line: "Title | URL".
+        $subject_raw = (string) get_user_meta( $this->user_id, 'ligase_subject_of', true );
+        $subject_of  = $this->parse_subject_of( $subject_raw );
+        if ( ! empty( $subject_of ) ) {
+            $schema['subjectOf'] = count( $subject_of ) === 1 ? $subject_of[0] : $subject_of;
+        }
+
+        // workExperience — structured career history as OrganizationRole. More
+        // expressive than a single jobTitle string, useful for personal-brand sites.
+        // Format per line: "Role | Org name | Org URL | startYear | endYear?".
+        $we_raw     = (string) get_user_meta( $this->user_id, 'ligase_work_experience', true );
+        $experience = $this->parse_work_experience( $we_raw );
+        if ( ! empty( $experience ) ) {
+            $schema['workExperience'] = count( $experience ) === 1 ? $experience[0] : $experience;
+        }
+
+        // award — recognition received from external bodies. Plain string per line,
+        // or "Name | Issuer | year" for structured awards. Falls back to string array
+        // when no issuer is given (Google accepts both shapes).
+        $award_raw = (string) get_user_meta( $this->user_id, 'ligase_award', true );
+        $awards    = $this->parse_awards( $award_raw );
+        if ( ! empty( $awards ) ) {
+            $schema['award'] = count( $awards ) === 1 ? $awards[0] : $awards;
+        }
 
         // mainEntityOfPage — author archive
         $author_url = get_author_posts_url( $this->user_id );
@@ -366,6 +418,133 @@ class Ligase_Type_Person {
             }
             $seen[ $key ] = true;
             $out[] = $url;
+        }
+        return $out;
+    }
+
+    /**
+     * Parse subjectOf textarea — `Title | URL` per line. Both required;
+     * lines missing either part are skipped. Emits Article nodes (not
+     * CreativeWork) because Google's Knowledge Graph treats Article subjects
+     * as a stronger authority signal for the person entity.
+     *
+     * @return array<int,array>
+     */
+    private function parse_subject_of( string $raw ): array {
+        if ( $raw === '' ) {
+            return [];
+        }
+        $out = [];
+        foreach ( preg_split( '/\r\n|\r|\n/', $raw ) ?: [] as $line ) {
+            $line = trim( $line );
+            if ( $line === '' ) {
+                continue;
+            }
+            $parts = array_map( 'trim', explode( '|', $line ) );
+            $title = (string) ( $parts[0] ?? '' );
+            $url   = (string) ( $parts[1] ?? '' );
+            if ( $title === '' || $url === '' ) {
+                continue;
+            }
+            $out[] = [
+                '@type' => 'Article',
+                'name'  => wp_strip_all_tags( $title ),
+                'url'   => esc_url( $url ),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Parse workExperience textarea — `Role | Org | URL? | startYear? | endYear?` per line.
+     * Emits OrganizationRole nodes with nested Organization. Role + Org are required,
+     * URL / dates optional. Years can be either YYYY or YYYY-MM-DD.
+     *
+     * @return array<int,array>
+     */
+    private function parse_work_experience( string $raw ): array {
+        if ( $raw === '' ) {
+            return [];
+        }
+        $out = [];
+        foreach ( preg_split( '/\r\n|\r|\n/', $raw ) ?: [] as $line ) {
+            $line = trim( $line );
+            if ( $line === '' ) {
+                continue;
+            }
+            $parts = array_map( 'trim', explode( '|', $line ) );
+            $role  = (string) ( $parts[0] ?? '' );
+            $org   = (string) ( $parts[1] ?? '' );
+            if ( $role === '' || $org === '' ) {
+                continue;
+            }
+            $org_url = (string) ( $parts[2] ?? '' );
+            $start   = (string) ( $parts[3] ?? '' );
+            $end     = (string) ( $parts[4] ?? '' );
+
+            $org_node = [ '@type' => 'Organization', 'name' => wp_strip_all_tags( $org ) ];
+            if ( $org_url !== '' ) {
+                $org_node['url'] = esc_url( $org_url );
+            }
+            $role_node = [
+                '@type'    => 'OrganizationRole',
+                'roleName' => wp_strip_all_tags( $role ),
+                'memberOf' => $org_node,
+            ];
+            if ( preg_match( '/^\d{4}(-\d{2}(-\d{2})?)?$/', $start ) ) {
+                $role_node['startDate'] = $start;
+            }
+            if ( preg_match( '/^\d{4}(-\d{2}(-\d{2})?)?$/', $end ) ) {
+                $role_node['endDate'] = $end;
+            }
+            $out[] = $role_node;
+        }
+        return $out;
+    }
+
+    /**
+     * Parse awards textarea — either a plain string per line ("Diamenty Forbesa 2023")
+     * or a structured "Name | Issuer | year" line. Plain-string lines come back as
+     * raw strings (Google accepts string-or-object); structured lines become full
+     * award objects so the issuer is searchable.
+     *
+     * @return array<int, string|array>
+     */
+    private function parse_awards( string $raw ): array {
+        if ( $raw === '' ) {
+            return [];
+        }
+        $out = [];
+        foreach ( preg_split( '/\r\n|\r|\n/', $raw ) ?: [] as $line ) {
+            $line = trim( $line );
+            if ( $line === '' ) {
+                continue;
+            }
+            if ( strpos( $line, '|' ) === false ) {
+                $out[] = wp_strip_all_tags( $line );
+                continue;
+            }
+            $parts  = array_map( 'trim', explode( '|', $line ) );
+            $name   = (string) ( $parts[0] ?? '' );
+            $issuer = (string) ( $parts[1] ?? '' );
+            $year   = (string) ( $parts[2] ?? '' );
+            if ( $name === '' ) {
+                continue;
+            }
+            // schema.org/award accepts plain text or a Thing. Use the simple
+            // text+separator shape ("Award name (Issuer, 2023)") because Google's
+            // Person doc explicitly shows award as text. Keeps the SERP clean.
+            $label = $name;
+            if ( $issuer !== '' ) {
+                $label .= ' (' . $issuer;
+                if ( $year !== '' ) {
+                    $label .= ', ' . $year;
+                }
+                $label .= ')';
+            } elseif ( $year !== '' ) {
+                $label .= ' (' . $year . ')';
+            }
+            $out[] = wp_strip_all_tags( $label );
         }
         return $out;
     }

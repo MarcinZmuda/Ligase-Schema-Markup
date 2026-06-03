@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.17
+Stable tag: 2.4.18
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,23 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.18 =
+**Person — 5 nowych pól E-E-A-T dla personal brand / ekspert SEO.**
+
+Rozszerzenie Person schema o pola które wcześniej trzeba było dorabiać przez `apply_filters( 'ligase_person' )`. Wszystkie w UI **User → Profile → Ligase — Profil autora (Person schema)**.
+
+1. **`worksFor` external** (`ligase_works_for_name` + `ligase_works_for_url`) — Twoja własna firma/kancelaria zamiast forced `@id` ref do site Organization. Przykład: ekspert na cudzym portalu (infor.pl), który prowadzi własną kancelarię — chce `worksFor: { @type: Organization, name: "Kancelaria X" }`, nie `worksFor: { @id: #org }` wydawcy. Gdy puste → fallback do site Organization (dotychczasowe zachowanie).
+
+2. **`affiliation`** (`ligase_affiliation` textarea repeater: `Nazwa | URL`) — luźne powiązania. Schema rozróżnia: `memberOf` = formalne członkostwo, `affiliation` = współpraca / advisory board. Wcześniej każde "powiązanie" leciało do memberOf — teraz można rozróżniać.
+
+3. **`subjectOf`** (`ligase_subject_of` textarea: `Tytuł | URL`) — zewnętrzne artykuły / wywiady / publikacje gdzie autor jest TEMATEM. Silny sygnał Knowledge Graph: "ta encja jest opisywana przez te niezależne publikacje". Emitowane jako Article nodes. Idealne dla speaker-deck'ów i podsumowań konferencji.
+
+4. **`workExperience`** (`ligase_work_experience` textarea: `Stanowisko | Firma | URL | rok od | rok do`) — strukturalna historia kariery jako OrganizationRole + Organization. Bardziej ekspresyjne niż single jobTitle. Walidacja dat: YYYY lub YYYY-MM-DD.
+
+5. **`award`** (`ligase_award` textarea: jeden per linia, lub `Nazwa | Wydawca | rok` dla struktury) — nagrody zewnętrzne. Plain string lub strukturalne "Nazwa (Wydawca, rok)" output.
+
+Wszystkie pola w pełni opcjonalne — Person renderuje się jak wcześniej gdy puste. URL'e w textarea fields automatycznie sanitized przez `esc_url_raw()` (drop `javascript:` / `data:` / `vbscript:` schemes).
 
 = 2.4.17 =
 **Audytor: 0/100 dla wszystkich postów (był to bug audytora, nie schemy).**

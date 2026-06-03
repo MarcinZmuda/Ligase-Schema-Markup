@@ -734,6 +734,28 @@ class Ligase_Admin {
 			'ligase_member_of'     => array( 'label' => __( 'Członek organizacji (memberOf)', 'ligase' ), 'type' => 'textarea',
 				'hint' => __( 'Jeden wpis na linię, format: Nazwa | URL\nnp: Okręgowa Izba Radców Prawnych w Lublinie | https://oirp.lublin.pl/', 'ligase' ) ),
 
+			// --- worksFor external (overrides the auto-link to site Organization) ---
+			'ligase_works_for_name' => array( 'label' => __( 'worksFor — własna firma / kancelaria (nazwa)', 'ligase' ), 'type' => 'text',
+				'hint' => __( 'Wypełnij gdy NIE pracujesz dla wydawcy tej strony, tylko prowadzisz własną kancelarię/firmę. Przykład: Kancelaria Doradztwa Podatkowego Rafał Styczyński. Pozostaw puste, żeby worksFor wskazywał na Organization tej strony.', 'ligase' ) ),
+			'ligase_works_for_url' => array( 'label' => __( 'worksFor — URL', 'ligase' ), 'type' => 'url',
+				'hint' => __( 'np. https://www.stytax.pl', 'ligase' ) ),
+
+			// --- affiliation (luźne powiązania, w odróżnieniu od memberOf) ---
+			'ligase_affiliation'   => array( 'label' => __( 'affiliation (luźne powiązania)', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Organizacje z którymi współpracujesz ale nie jesteś formalnym członkiem. memberOf = formalne członkostwo, affiliation = luźne ties. Jeden wpis na linię: Nazwa | URL\nnp: Stowarzyszenie SEO Polska | https://seopolska.org/', 'ligase' ) ),
+
+			// --- subjectOf (cross-link do wywiadów / external publications gdzie jesteś tematem) ---
+			'ligase_subject_of'    => array( 'label' => __( 'subjectOf — wywiady / publikacje o Tobie', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Zewnętrzne artykuły gdzie jesteś tematem (wywiady, profile w prasie, podsumowania konferencyjne). Silny sygnał Knowledge Graph. Jeden wpis na linię: Tytuł | URL\nnp: Prelegenci semKRK i semWAW podsumowują 2024 | https://devagroup.pl/blog/...', 'ligase' ) ),
+
+			// --- workExperience (narrative kariery jako OrganizationRole) ---
+			'ligase_work_experience' => array( 'label' => __( 'workExperience (historia zawodowa)', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Historia kariery w formie strukturalnej. Jeden wpis na linię: Stanowisko | Nazwa firmy | URL firmy | rok od | rok do (opcj.)\nnp:\nFounder & Owner | Embasy | https://embasy.pl | 2014 |\nHead of Internet Marketing | Orion Media Group |  | 2014 | 2018', 'ligase' ) ),
+
+			// --- award (nagrody zewnętrzne) ---
+			'ligase_award'         => array( 'label' => __( 'award (nagrody, wyróżnienia)', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Jedno wyróżnienie na linię. Format prosty (string) lub: Nazwa | Wydawca | rok\nnp:\nDiamenty Forbesa 2023\nProfesjonalista Roku 2022 | Festiwal SEO | 2022', 'ligase' ) ),
+
 			// --- sameAs override / extras ---
 			'ligase_extra_sameas'  => array( 'label' => __( 'Dodatkowe sameAs (URL/linia)', 'ligase' ), 'type' => 'textarea',
 				'hint' => __( 'Profile zewnętrzne których WP nie zbiera: ORCID, Google Scholar, własny katalog branżowy itd. Po jednym URL na linię.\nProfile FB/Instagram/LinkedIn/X/YouTube/Pinterest/Wikipedia są zbierane automatycznie z pól kontaktowych WP.', 'ligase' ) ),
@@ -825,6 +847,7 @@ class Ligase_Admin {
 			'ligase_given_name', 'ligase_family_name', 'ligase_honorific',
 			'ligase_job_title', 'ligase_telephone', 'ligase_knows_language',
 			'ligase_alumni_of', 'ligase_alumni_of_dept', 'ligase_credential', // ligase_credential kept for backward compat
+			'ligase_works_for_name',
 		);
 		foreach ( $text_fields as $key ) {
 			if ( isset( $_POST[ $key ] ) ) {
@@ -835,7 +858,7 @@ class Ligase_Admin {
 		// URL fields
 		$url_fields = array(
 			'ligase_linkedin', 'ligase_twitter', 'ligase_wikidata',
-			'ligase_alumni_of_url', 'ligase_image_url',
+			'ligase_alumni_of_url', 'ligase_image_url', 'ligase_works_for_url',
 		);
 		foreach ( $url_fields as $key ) {
 			if ( isset( $_POST[ $key ] ) ) {
@@ -850,12 +873,17 @@ class Ligase_Admin {
 			'ligase_credentials',     // repeater
 			'ligase_member_of',       // repeater
 			'ligase_extra_sameas',    // URL per line
+			'ligase_affiliation',     // repeater Name | URL
+			'ligase_subject_of',      // repeater Title | URL
+			'ligase_work_experience', // repeater Role | Org | URL | start | end
+			'ligase_award',           // one award per line (string or Name | Issuer | year)
 		);
 		// Fields whose lines may contain URL tokens (separated by '|' or one per line).
 		// wp_strip_all_tags scrubs HTML but does NOT drop `javascript:` / `data:` /
 		// `vbscript:` schemes — pipe each URL-looking part through esc_url_raw() which
 		// only allows whitelisted protocols (http/https/mailto/etc.).
-		$url_bearing = array( 'ligase_credentials', 'ligase_member_of', 'ligase_extra_sameas' );
+		$url_bearing = array( 'ligase_credentials', 'ligase_member_of', 'ligase_extra_sameas',
+			'ligase_affiliation', 'ligase_subject_of', 'ligase_work_experience' );
 		foreach ( $textarea_fields as $key ) {
 			if ( isset( $_POST[ $key ] ) ) {
 				$raw = (string) wp_unslash( $_POST[ $key ] );
