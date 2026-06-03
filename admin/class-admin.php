@@ -342,6 +342,7 @@ class Ligase_Admin {
 			'_ligase_enable_qapage', '_ligase_enable_glossary', '_ligase_enable_claimreview',
 			'_ligase_enable_software', '_ligase_enable_course', '_ligase_enable_event', '_ligase_enable_service',
 			'_ligase_enable_product', '_ligase_enable_recipe', '_ligase_enable_jobposting', '_ligase_enable_forum',
+			'_ligase_enable_podcast_series',
 			'_ligase_paywalled', '_ligase_force_date_modified', '_ligase_enable_profile_page',
 		);
 		foreach ( $toggles as $key ) {
@@ -555,6 +556,39 @@ class Ligase_Admin {
 			}
 		}
 
+		// _ligase_podcast: per-page PodcastSeries data. Keys: name, description,
+		// same_as (textarea, one URL per line), feed_url, language, number_of_episodes.
+		// Empty subarray gets stored as deleted so we don't bloat postmeta with [].
+		if ( isset( $_POST['_ligase_podcast'] ) && is_array( $_POST['_ligase_podcast'] ) ) {
+			$raw  = wp_unslash( $_POST['_ligase_podcast'] );
+			$pod  = array();
+			$pod['name']                = sanitize_text_field( (string) ( $raw['name'] ?? '' ) );
+			$pod['description']         = sanitize_textarea_field( (string) ( $raw['description'] ?? '' ) );
+			// same_as: scrub each URL line through esc_url_raw to drop bad schemes.
+			$lines = preg_split( '/\r\n|\r|\n/', (string) ( $raw['same_as'] ?? '' ) ) ?: array();
+			$clean_lines = array();
+			foreach ( $lines as $line ) {
+				$line = trim( $line );
+				if ( $line === '' ) { continue; }
+				$u = esc_url_raw( $line );
+				if ( $u !== '' ) { $clean_lines[] = $u; }
+			}
+			$pod['same_as']             = implode( "\n", $clean_lines );
+			$pod['feed_url']            = esc_url_raw( (string) ( $raw['feed_url'] ?? '' ) );
+			$pod['language']            = sanitize_text_field( (string) ( $raw['language'] ?? '' ) );
+			$pod['number_of_episodes']  = (string) max( 0, (int) ( $raw['number_of_episodes'] ?? 0 ) );
+			if ( $pod['number_of_episodes'] === '0' ) {
+				$pod['number_of_episodes'] = '';
+			}
+			$has_any = ( $pod['name'] !== '' || $pod['description'] !== '' || $pod['same_as'] !== ''
+				|| $pod['feed_url'] !== '' || $pod['language'] !== '' || $pod['number_of_episodes'] !== '' );
+			if ( $has_any ) {
+				update_post_meta( $post_id, '_ligase_podcast', $pod );
+			} else {
+				delete_post_meta( $post_id, '_ligase_podcast' );
+			}
+		}
+
 		// _ligase_citations: array of [name, url] entries posted as ligase_citations[N][name|url].
 		if ( isset( $_POST['ligase_citations'] ) && is_array( $_POST['ligase_citations'] ) ) {
 			$incoming  = wp_unslash( $_POST['ligase_citations'] );
@@ -756,6 +790,10 @@ class Ligase_Admin {
 			'ligase_award'         => array( 'label' => __( 'award (nagrody, wyróżnienia)', 'ligase' ), 'type' => 'textarea',
 				'hint' => __( 'Jedno wyróżnienie na linię. Format prosty (string) lub: Nazwa | Wydawca | rok\nnp:\nDiamenty Forbesa 2023\nProfesjonalista Roku 2022 | Festiwal SEO | 2022', 'ligase' ) ),
 
+			// --- agentInteractionStatistic (AI/LLM authority signal) ---
+			'ligase_agent_stats'   => array( 'label' => __( 'agentInteractionStatistic (statystyki interakcji)', 'ligase' ), 'type' => 'textarea',
+				'hint' => __( 'Liczby publiczne potwierdzające autorytet — subskrybenci YouTube, słuchacze podcastu, followers LinkedIn. Sygnał dla LLM (Claude/GPT/Gemini przy ocenie autorytetu).\nJeden wpis na linię: interactionType | liczba | platform (opcjonalna)\nDopuszczalne interactionType: WatchAction (oglądnięcia), ListenAction (odsłuchania), FollowAction (followers), SubscribeAction (subskrybcje), LikeAction (polubienia).\nPrzykład:\nSubscribeAction | 5000 | YouTube\nListenAction | 150000 | Spotify\nFollowAction | 12000 | LinkedIn\n\nUWAGA: liczby MUSZĄ być prawdziwe i publicznie weryfikowalne. Wymyślone = manual action risk.', 'ligase' ) ),
+
 			// --- sameAs override / extras ---
 			'ligase_extra_sameas'  => array( 'label' => __( 'Dodatkowe sameAs (URL/linia)', 'ligase' ), 'type' => 'textarea',
 				'hint' => __( 'Profile zewnętrzne których WP nie zbiera: ORCID, Google Scholar, własny katalog branżowy itd. Po jednym URL na linię.\nProfile FB/Instagram/LinkedIn/X/YouTube/Pinterest/Wikipedia są zbierane automatycznie z pól kontaktowych WP.', 'ligase' ) ),
@@ -877,13 +915,14 @@ class Ligase_Admin {
 			'ligase_subject_of',      // repeater Title | URL
 			'ligase_work_experience', // repeater Role | Org | URL | start | end
 			'ligase_award',           // one award per line (string or Name | Issuer | year)
+			'ligase_agent_stats',     // repeater interactionType | count | platform
 		);
 		// Fields whose lines may contain URL tokens (separated by '|' or one per line).
 		// wp_strip_all_tags scrubs HTML but does NOT drop `javascript:` / `data:` /
 		// `vbscript:` schemes — pipe each URL-looking part through esc_url_raw() which
 		// only allows whitelisted protocols (http/https/mailto/etc.).
 		$url_bearing = array( 'ligase_credentials', 'ligase_member_of', 'ligase_extra_sameas',
-			'ligase_affiliation', 'ligase_subject_of', 'ligase_work_experience' );
+			'ligase_affiliation', 'ligase_subject_of', 'ligase_work_experience', 'ligase_agent_stats' );
 		foreach ( $textarea_fields as $key ) {
 			if ( isset( $_POST[ $key ] ) ) {
 				$raw = (string) wp_unslash( $_POST[ $key ] );

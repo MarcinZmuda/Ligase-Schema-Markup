@@ -232,6 +232,15 @@ class Ligase_Type_Person {
             $schema['award'] = count( $awards ) === 1 ? $awards[0] : $awards;
         }
 
+        // agentInteractionStatistic — publicly verifiable counts (YT subscribers,
+        // podcast plays, LinkedIn followers). Strong LLM authority signal when real;
+        // structured-data spam risk if fabricated. Format: "Action | count | platform".
+        $stats_raw = (string) get_user_meta( $this->user_id, 'ligase_agent_stats', true );
+        $stats     = $this->parse_agent_stats( $stats_raw );
+        if ( ! empty( $stats ) ) {
+            $schema['agentInteractionStatistic'] = count( $stats ) === 1 ? $stats[0] : $stats;
+        }
+
         // mainEntityOfPage — author archive
         $author_url = get_author_posts_url( $this->user_id );
         if ( $author_url ) {
@@ -545,6 +554,56 @@ class Ligase_Type_Person {
                 $label .= ' (' . $year . ')';
             }
             $out[] = wp_strip_all_tags( $label );
+        }
+        return $out;
+    }
+
+    /**
+     * Parse agentInteractionStatistic textarea — "Action | count | platform" per line.
+     * Emits InteractionCounter nodes with interactionType set to the schema.org Action.
+     * Action whitelist enforces values Google accepts; unknown actions are skipped
+     * rather than passed through (silent drop better than schema-spam warning).
+     *
+     * @return array<int,array>
+     */
+    private function parse_agent_stats( string $raw ): array {
+        if ( $raw === '' ) {
+            return [];
+        }
+        $allowed_actions = array(
+            'WatchAction', 'ListenAction', 'ReadAction', 'FollowAction',
+            'SubscribeAction', 'LikeAction', 'ShareAction', 'CommentAction',
+            'InteractAction',
+        );
+        $out = [];
+        foreach ( preg_split( '/\r\n|\r|\n/', $raw ) ?: [] as $line ) {
+            $line = trim( $line );
+            if ( $line === '' ) {
+                continue;
+            }
+            $parts    = array_map( 'trim', explode( '|', $line ) );
+            $action   = (string) ( $parts[0] ?? '' );
+            $count    = (string) ( $parts[1] ?? '' );
+            $platform = (string) ( $parts[2] ?? '' );
+            if ( $action === '' || ! in_array( $action, $allowed_actions, true ) ) {
+                continue;
+            }
+            $n = (int) preg_replace( '/[^\d]/', '', $count );
+            if ( $n <= 0 ) {
+                continue;
+            }
+            $node = [
+                '@type'                 => 'InteractionCounter',
+                'interactionType'       => 'https://schema.org/' . $action,
+                'userInteractionCount'  => $n,
+            ];
+            if ( $platform !== '' ) {
+                $node['interactionService'] = [
+                    '@type' => 'WebSite',
+                    'name'  => wp_strip_all_tags( $platform ),
+                ];
+            }
+            $out[] = $node;
         }
         return $out;
     }

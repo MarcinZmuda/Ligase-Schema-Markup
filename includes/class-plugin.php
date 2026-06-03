@@ -53,6 +53,7 @@ class Ligase_Plugin {
             'includes/types/class-recipe.php',
             'includes/types/class-jobposting.php',
             'includes/types/class-discussionforumposting.php',
+            'includes/types/class-podcastseries.php',
             'includes/types/class-itemlist.php',
             'includes/class-generator.php',
             'includes/class-output.php',

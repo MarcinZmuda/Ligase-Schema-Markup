@@ -513,6 +513,7 @@ class Ligase_Generator {
             new Ligase_Type_Recipe(),
             new Ligase_Type_JobPosting(),
             new Ligase_Type_DiscussionForumPosting(),
+            new Ligase_Type_PodcastSeries(),
         ];
     }
 

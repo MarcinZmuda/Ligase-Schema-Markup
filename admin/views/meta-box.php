@@ -74,6 +74,10 @@ $toggles = array(
 		'label' => __( 'DiscussionForumPosting (forum/wątek)', 'ligase' ),
 		'hint'  => __( 'Discussions & Forums SERP od XI 2023. bbPress topics wykrywane automatycznie.', 'ligase' ),
 	),
+	'_ligase_enable_podcast_series' => array(
+		'label' => __( 'PodcastSeries (strona-hub podcastu)', 'ligase' ),
+		'hint'  => __( 'Dla landing page podcastu (lista odcinków, opis serii). Pola podcastu: name, description, image, sameAs (Spotify/Apple/YouTube), webFeed (RSS), numberOfEpisodes — zostaw puste żeby plugin sam pobrał z postu.', 'ligase' ),
+	),
 );
 
 $allowed_types = array(
@@ -135,6 +139,7 @@ $allowed_types = array(
 	$product_override     = is_array( $override['Product'] ?? null ) ? $override['Product'] : array();
 	$post_type_obj        = get_post_type_object( $post->post_type );
 	$show_product_section = $post->post_type === 'product' && function_exists( 'wc_get_product' );
+	$podcast              = (array) get_post_meta( $post->ID, '_ligase_podcast', true );
 	?>
 
 	<details style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e0e0e0;">
@@ -157,6 +162,63 @@ $allowed_types = array(
 				<input type="text" name="_ligase_paywall_selector" value="<?php echo esc_attr( $paywall_selector ); ?>"
 					placeholder=".paywall" style="width:100%;" />
 			</label>
+		</fieldset>
+
+		<fieldset style="margin: 8px 0;">
+			<legend style="font-weight: 600; font-size: 12px; color: #444;">
+				<?php esc_html_e( 'PodcastSeries (gdy "PodcastSeries" jest włączone wyżej)', 'ligase' ); ?>
+			</legend>
+			<label style="display:block; margin:6px 0;">
+				<span style="display:block; font-size:11px; color:#646970;">
+					<?php esc_html_e( 'Nazwa serii (pozostaw puste żeby użyć tytułu strony)', 'ligase' ); ?>
+				</span>
+				<input type="text" name="_ligase_podcast[name]"
+					value="<?php echo esc_attr( (string) ( $podcast['name'] ?? '' ) ); ?>"
+					placeholder="<?php esc_attr_e( 'np. Update Time by Marcin Żmuda', 'ligase' ); ?>"
+					style="width:100%;" />
+			</label>
+			<label style="display:block; margin:6px 0;">
+				<span style="display:block; font-size:11px; color:#646970;">
+					<?php esc_html_e( 'Opis (puste = excerpt strony, max 500 znaków)', 'ligase' ); ?>
+				</span>
+				<textarea name="_ligase_podcast[description]" rows="3" style="width:100%;"
+				><?php echo esc_textarea( (string) ( $podcast['description'] ?? '' ) ); ?></textarea>
+			</label>
+			<label style="display:block; margin:6px 0;">
+				<span style="display:block; font-size:11px; color:#646970;">
+					<?php esc_html_e( 'sameAs — platformy zewnętrzne (jeden URL na linię): Spotify, Apple Podcasts, YouTube, Pocket Casts, RSS feeds w katalogach', 'ligase' ); ?>
+				</span>
+				<textarea name="_ligase_podcast[same_as]" rows="4" style="width:100%;"
+					placeholder="https://open.spotify.com/show/...&#10;https://podcasts.apple.com/...&#10;https://www.youtube.com/@..."
+				><?php echo esc_textarea( (string) ( $podcast['same_as'] ?? '' ) ); ?></textarea>
+			</label>
+			<label style="display:block; margin:6px 0;">
+				<span style="display:block; font-size:11px; color:#646970;">
+					<?php esc_html_e( 'webFeed (RSS) — pełny URL kanału RSS, używany przez katalogi (Apple Podcasts)', 'ligase' ); ?>
+				</span>
+				<input type="url" name="_ligase_podcast[feed_url]"
+					value="<?php echo esc_attr( (string) ( $podcast['feed_url'] ?? '' ) ); ?>"
+					placeholder="https://anchor.fm/s/.../podcast/rss"
+					style="width:100%;" />
+			</label>
+			<div style="display:flex; gap:8px; margin:6px 0;">
+				<label style="flex:1;">
+					<span style="display:block; font-size:11px; color:#646970;">
+						<?php esc_html_e( 'Język (BCP-47)', 'ligase' ); ?>
+					</span>
+					<input type="text" name="_ligase_podcast[language]"
+						value="<?php echo esc_attr( (string) ( $podcast['language'] ?? '' ) ); ?>"
+						placeholder="pl-PL" style="width:100%;" />
+				</label>
+				<label style="flex:1;">
+					<span style="display:block; font-size:11px; color:#646970;">
+						<?php esc_html_e( 'Liczba odcinków', 'ligase' ); ?>
+					</span>
+					<input type="number" min="0" name="_ligase_podcast[number_of_episodes]"
+						value="<?php echo esc_attr( (string) ( $podcast['number_of_episodes'] ?? '' ) ); ?>"
+						style="width:100%;" />
+				</label>
+			</div>
 		</fieldset>
 
 		<fieldset style="margin: 8px 0;">

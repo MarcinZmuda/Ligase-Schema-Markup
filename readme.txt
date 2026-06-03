@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.18
+Stable tag: 2.4.19
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,31 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.19 =
+**PodcastSeries type + agentInteractionStatistic dla Person — last 100% of marcinzmuda.com plan.**
+
+**PodcastSeries (nowy typ schemy).** Klasa `Ligase_Type_PodcastSeries` emituje PodcastSeries dla strony hub'u podcastu (np. `/update-time-by-marcin-zmuda/`). Włączane per-post checkbox'em `_ligase_enable_podcast_series` w meta-boxie. Dane podcastu w sekcji "Pola zaawansowane → PodcastSeries":
+* `name` (puste = tytuł strony)
+* `description` (puste = excerpt)
+* `image` (puste = featured image)
+* `same_as` — platformy zewnętrzne (Spotify / Apple Podcasts / YouTube), jeden URL na linię, automatyczna walidacja przez esc_url_raw
+* `feed_url` — RSS feed (webFeed property, używany przez Apple Podcasts directory)
+* `language` — BCP-47 (default lokalizacja serwisu)
+* `number_of_episodes` — optional liczba
+
+Author routes through `Ligase_Type_BlogPosting::author_ref_id()` (respektuje org_author_mode + ligase_is_redakcja). Publisher → site Organization. Wszystkie pola opcjonalne; podstawowy validny PodcastSeries wymaga tylko name (z fallback do tytułu) + URL.
+
+**agentInteractionStatistic (Person AI/LLM signal).** Nowe pole user profile `ligase_agent_stats` — textarea repeater `interactionType | count | platform`. Emituje `InteractionCounter` nodes na Person:
+* WatchAction / ListenAction / ReadAction
+* FollowAction / SubscribeAction
+* LikeAction / ShareAction / CommentAction / InteractAction
+
+Action whitelist enforced — nieznane actions silnie dropowane (lepsze niż schema-spam warning). Count musi być > 0; platform optional (emit jako interactionService → WebSite).
+
+**UWAGA**: liczby MUSZĄ być publicznie weryfikowalne (Twoje YouTube subs, Spotify plays, LinkedIn followers). Wymyślone = manual action risk za structured-data spam.
+
+Po 2.4.19, plan z TL;DR dla personal-brand SEO (worksFor external, affiliation, subjectOf, workExperience, award, agentInteractionStatistic, PodcastSeries) jest w pełni pokryty z UI w Ligase.
 
 = 2.4.18 =
 **Person — 5 nowych pól E-E-A-T dla personal brand / ekspert SEO.**
