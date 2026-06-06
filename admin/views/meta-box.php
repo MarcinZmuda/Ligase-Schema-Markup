@@ -16,6 +16,26 @@ $opts           = (array) get_option( 'ligase_options', array() );
 $global_default = $opts['default_schema_type'] ?? 'BlogPosting';
 $schema_type    = get_post_meta( $post->ID, '_ligase_schema_type', true ) ?: $global_default;
 
+// Map each toggle to the schema.org type it enables — used to render the
+// popularity badge from Google's 2026-05 stats next to the checkbox.
+$toggle_type_map = array(
+	'_ligase_enable_faq'            => 'FAQPage',
+	'_ligase_enable_howto'          => 'HowTo',
+	'_ligase_enable_review'         => 'Review',
+	'_ligase_enable_qapage'         => 'QAPage',
+	'_ligase_enable_glossary'       => 'DefinedTerm',
+	'_ligase_enable_claimreview'    => 'ClaimReview',
+	'_ligase_enable_software'       => 'SoftwareApplication',
+	'_ligase_enable_course'         => 'Course',
+	'_ligase_enable_event'          => 'Event',
+	'_ligase_enable_service'        => 'Service',
+	'_ligase_enable_product'        => 'Product',
+	'_ligase_enable_recipe'         => 'Recipe',
+	'_ligase_enable_jobposting'     => 'JobPosting',
+	'_ligase_enable_forum'          => 'DiscussionForumPosting',
+	'_ligase_enable_podcast_series' => 'PodcastSeries',
+);
+
 // All toggle flags
 $toggles = array(
 	'_ligase_enable_faq'         => array(
@@ -94,6 +114,11 @@ $allowed_types = array(
 	<p style="margin: 0 0 12px;">
 		<label for="ligase_schema_type" style="display: block; font-weight: 600; margin-bottom: 4px;">
 			<?php esc_html_e( 'Typ schematu', 'ligase' ); ?>
+			<?php
+			if ( class_exists( 'Ligase_Popularity_Stats' ) ) {
+				echo Ligase_Popularity_Stats::badge_html( $schema_type ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			}
+			?>
 		</label>
 		<select id="ligase_schema_type" name="ligase_schema_type" style="width: 100%;">
 			<?php foreach ( $allowed_types as $value => $label ) : ?>
@@ -102,6 +127,9 @@ $allowed_types = array(
 				</option>
 			<?php endforeach; ?>
 		</select>
+		<span style="display:block; font-size:11px; color:#646970; margin-top:4px;">
+			<?php esc_html_e( 'Etykieta popularności pochodzi z Google open-web crawl (schemaorg/schemaorg public_stats, maj 2026). "Powszechne" / "ustabilizowane" = bezpieczny wybór dla rich resultów.', 'ligase' ); ?>
+		</span>
 	</p>
 
 	<fieldset style="margin: 0 0 8px; padding: 8px 0 0; border-top: 1px solid #e0e0e0;">
@@ -114,6 +142,15 @@ $allowed_types = array(
 			<label style="display: block; margin: 6px 0; cursor: pointer;">
 				<input type="checkbox" name="<?php echo esc_attr( $key ); ?>" value="1" <?php checked( $enabled, '1' ); ?> />
 				<?php echo esc_html( $toggle['label'] ); ?>
+				<?php
+				// Google open-web popularity badge — shows whether a type is
+				// safe-default (10M+/1M-10M) or niche (10K-100K). Source:
+				// schemaorg/schemaorg public_stats/google/2026_05.csv
+				if ( class_exists( 'Ligase_Popularity_Stats' ) && isset( $toggle_type_map[ $key ] ) ) {
+					$badge = Ligase_Popularity_Stats::badge_html( $toggle_type_map[ $key ] );
+					echo $badge; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — already escaped inside
+				}
+				?>
 				<?php if ( ! empty( $toggle['hint'] ) ) : ?>
 					<span style="display: block; font-size: 11px; color: #646970; margin: 2px 0 0 22px;">
 						<?php echo esc_html( $toggle['hint'] ); ?>

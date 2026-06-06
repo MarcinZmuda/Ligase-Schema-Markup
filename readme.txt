@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.19
+Stable tag: 2.4.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,30 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.20 =
+**Google open-web schema popularity stats — badge w UI + coverage doc.**
+
+Nowy dataset z `schemaorg/schemaorg` (`data/public_stats/google/2026_05.csv` — maj 2026) skompresowany do `Ligase_Popularity_Stats::types()`. Każdy obsługiwany typ schemy ma teraz mapowanie do tier'a popularności:
+
+* Tier 1: `10M+` domen (BreadcrumbList, Person, Organization, WebPage...) — POWSZECHNE
+* Tier 2: `1M-10M` (Article, Product, Service, FAQPage...) — USTABILIZOWANE
+* Tier 3: `100K-1M` (Event, JobPosting, ProfilePage, InteractionCounter...) — USTABILIZOWANE
+* Tier 4: `10K-100K` (Recipe, Course, PodcastSeries, QAPage...) — NISZOWE
+* Tier 5: `1K-10K` (ClaimReview, NewsMediaOrganization...) — BARDZO NISZOWE
+
+**Co user widzi w UI:**
+* Meta-box post edit: obok każdego enable checkbox (FAQ, HowTo, Event, Product itd.) i obok dropdownu "Typ schematu" jest kolorowa odznaka z bucket'em — np. `FAQPage 1M-10M · ustabilizowane`, `PodcastSeries 10K-100K · niszowe`.
+* Tooltip nad odznaką pokazuje liczbę domen i datę snapshot'a.
+
+**Walidacja decyzji 2.4.19** (PodcastSeries + agentInteractionStatistic):
+* PodcastSeries → tier 4 (10K-100K) — niche ale realne, decyzja uzasadniona personal-brand SEO use case'em.
+* InteractionCounter → tier 3 (100K-1M) — established, nie ekspeymentalne.
+* subjectOf (z 2.4.18) → 100K-1M — established.
+
+**Doc**: `docs/google-stats-coverage-2026-05.md` — pełny coverage map Ligase vs Google open-web stats, lista konkretnych luk do dorobienia w 2.5.0 (AggregateOffer, OfferCatalog, NewsMediaOrganization, identifier KRS/NIP/REGON, Trust Project policies).
+
+**Refresh cadence**: schema.org community drops nowy CSV ~co 6 miesięcy. Update przez `gh api repos/schemaorg/schemaorg/contents/data/public_stats/google` → regen `Ligase_Popularity_Stats::types()`.
 
 = 2.4.19 =
 **PodcastSeries type + agentInteractionStatistic dla Person — last 100% of marcinzmuda.com plan.**

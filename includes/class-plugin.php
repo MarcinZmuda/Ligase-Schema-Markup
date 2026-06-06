@@ -22,6 +22,7 @@ class Ligase_Plugin {
             'includes/class-logger.php',
             'includes/class-cache.php',
             'includes/class-suppressor.php',
+            'includes/class-popularity-stats.php',
             'includes/class-cache-bypass.php',
             'includes/class-score.php',
             // Contract-driven field system — must load before type-classes and generator
