@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.20
+Stable tag: 2.4.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,22 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.21 =
+**Generator: case 'page' nie wywoływał optional types — wszystkie opt-in typy na pages nie emitowały się.**
+
+Wykryte podczas wdrożenia 2.4.20 na marcinzmuda.com. `case 'page':` w `build_graph()` emitował tylko WebPage + BreadcrumbList + (opcjonalnie) Person/ProfilePage. Pominięte: foreach `get_optional_types()`.
+
+Skutek: na statycznej stronie WordPress (post_type=page) WSZYSTKIE opt-in typy nie wchodziły do grafu mimo zaznaczonych checkboxów:
+* PodcastSeries (`_ligase_enable_podcast_series=1` → ignored)
+* Service (`_ligase_enable_service=1` → ignored)
+* Event, FAQ, HowTo, Course, SoftwareApplication, Recipe, Review, etc.
+
+To była głównie regresja przy nowym typie. Inne ścieżki (`single_post`, `single_cpt`, taxonomy/blog_listing) prawidłowo iterowały optional types.
+
+Fix: dodany foreach `$this->get_optional_types()` do `case 'page'`. Każdy type ma własny meta-guard, więc iterowanie jest bezpieczne — emituje tylko jeśli `_ligase_enable_*` jest `1` na danej stronie.
+
+Po wgraniu: enable checkboxes w meta-boxie pages działają tak samo jak na postach.
 
 = 2.4.20 =
 **Google open-web schema popularity stats — badge w UI + coverage doc.**

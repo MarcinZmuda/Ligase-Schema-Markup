@@ -50,6 +50,16 @@ class Ligase_Generator {
                     $graph[] = ( new Ligase_Type_Person( $profile_uid ) )->build();
                     $graph[] = $this->build_profile_page( $profile_uid );
                 }
+                // Optional types (PodcastSeries / Service / Event / FAQ / HowTo / Course /
+                // SoftwareApplication / etc.) also opt-in via per-page _ligase_enable_*
+                // meta. Each type's build() guards its own meta check and returns null
+                // when not enabled, so iterating here is safe.
+                foreach ( $this->get_optional_types() as $type ) {
+                    $schema = $type->build();
+                    if ( ! empty( $schema ) ) {
+                        $graph[] = $schema;
+                    }
+                }
                 break;
             case 'front_page_posts':
                 $graph[] = $this->build_webpage( 'CollectionPage' );
