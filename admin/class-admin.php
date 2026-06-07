@@ -729,7 +729,7 @@ class Ligase_Admin {
 		$fields = array(
 			// --- Author entity type (Person vs Organization for redakcja) ---
 			'ligase_is_redakcja'  => array( 'label' => __( 'Ten użytkownik to redakcja / zespół (Organization, NIE Person)', 'ligase' ), 'type' => 'checkbox',
-				'hint' => __( 'Zaznacz dla kont typu "Redakcja MAKUMI" / "Sales Team" — wpisy tego użytkownika dostaną author = Organization (#org), a osobny węzeł Person NIE zostanie wyemitowany. Wszystkie pola Person poniżej (givenName / hasCredential / itd.) są wtedy ignorowane.', 'ligase' ) ),
+				'hint' => __( 'Zaznacz dla kont typu "Redakcja" / "Zespół" / "Sales Team" — wpisy tego użytkownika dostaną author = Organization (#org), a osobny węzeł Person NIE zostanie wyemitowany. Wszystkie pola Person poniżej (givenName / hasCredential / itd.) są wtedy ignorowane.', 'ligase' ) ),
 
 			// --- Identity ---
 			'ligase_given_name'   => array( 'label' => __( 'Imię (givenName)', 'ligase' ), 'type' => 'text',
@@ -770,7 +770,7 @@ class Ligase_Admin {
 
 			// --- worksFor external (overrides the auto-link to site Organization) ---
 			'ligase_works_for_name' => array( 'label' => __( 'worksFor — własna firma / kancelaria (nazwa)', 'ligase' ), 'type' => 'text',
-				'hint' => __( 'Wypełnij gdy NIE pracujesz dla wydawcy tej strony, tylko prowadzisz własną kancelarię/firmę. Przykład: Kancelaria Doradztwa Podatkowego Rafał Styczyński. Pozostaw puste, żeby worksFor wskazywał na Organization tej strony.', 'ligase' ) ),
+				'hint' => __( 'Wypełnij gdy NIE pracujesz dla wydawcy tej strony, tylko prowadzisz własną firmę / kancelarię. Przykład: Twoja Firma Sp. z o.o. Pozostaw puste, żeby worksFor wskazywał na Organization tej strony.', 'ligase' ) ),
 			'ligase_works_for_url' => array( 'label' => __( 'worksFor — URL', 'ligase' ), 'type' => 'url',
 				'hint' => __( 'np. https://www.stytax.pl', 'ligase' ) ),
 

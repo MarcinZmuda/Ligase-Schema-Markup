@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.22
+Stable tag: 2.4.23
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -129,6 +129,16 @@ When you enable external NER providers, post content is transmitted to the chose
 
 == Changelog ==
 
+= 2.4.23 =
+**Sprzątanie dokumentacji — neutralne przykłady + README/CHANGELOG sync.**
+
+* Wyrzucone wszystkie referencje do konkretnego klienta z hints / komentarzy / changelogu — przykłady są teraz neutralne ("Twoja Firma Sp. z o.o.", "Redakcja / Zespół / Sales Team", "sklep WooCommerce" zamiast specyficznych nazw).
+* `README.md` (GitHub landing) zsynchronizowany do 2.4.22: 25 typów schema (z PodcastSeries), pełne 18 pól E-E-A-T na Person (włącznie z `worksFor` external, affiliation, subjectOf, workExperience role-property pattern, award, agentInteractionStatistic), highlights kampanii 2.4.x.
+* `CHANGELOG.md` — dodany wpis 2.4.22 z kompletnym podsumowaniem zmian z 2.4.8 → 2.4.22 (Score typos, shippingDetails fix, OPcache auto-reset, PodcastSeries, Popularity stats, tabbed settings persistence, scrubber dla theme'owych duplikatów).
+* `CONTRIBUTING.md` — naprawione polskie znaki diakrytyczne (`Wspolpraca` → `Współpraca` itd.).
+
+Bez zmian funkcjonalnych w kodzie — tylko docs + hints sanityzacja.
+
 = 2.4.22 =
 **Schema.org Validator dwa errors w Person: `workExperience` + OrganizationRole `memberOf`.**
 
@@ -238,7 +248,7 @@ Wszystkie pola w pełni opcjonalne — Person renderuje się jak wcześniej gdy 
 = 2.4.17 =
 **Audytor: 0/100 dla wszystkich postów (był to bug audytora, nie schemy).**
 
-Symptom: panel "Skanowanie i naprawa" pokazywał Score = 0 dla wszystkich 176 postów makumi.eu, mimo że Rich Results Test ich produktów i artykułów był zielony.
+Symptom: panel "Skanowanie i naprawa" pokazywał Score = 0 dla wszystkich postów, mimo że Rich Results Test produktów i artykułów był zielony.
 
 Bug w `Ligase_Auditor::get_jsonld_for_post()`: parsowanie pierwszego `<script type="application/ld+json">` z `wp_head` zwracało top-level **envelope** `{"@context": "schema.org/", "@graph": [...]}`. Scorer patrzył na `$schema['headline']` / `$schema['@type']` / `$schema['author']` — których na envelope NIE MA (one są wewnątrz `@graph` w poszczególnych węzłach). Wynik: "Brak headline, Brak datePublished, Brak author..." dla każdego postu.
 
@@ -264,7 +274,7 @@ Te zmiany dotyczą TYLKO inline ItemList nodes — pełna ścieżka Product na s
 = 2.4.15 =
 **ItemList: wykluczające się właściwości + duplikat url (CRITICAL Rich Results error).**
 
-Karuzela kategorii makumi.eu (`/kategoria/koldry-obciazeniowe/`) zgłaszała 3 krytyczne błędy:
+Karuzela kategorii WooCommerce (`/kategoria/{slug}/`) zgłaszała 3 krytyczne błędy:
 * "Podano identyczne wartości właściwości, a muszą one być niepowtarzalne" (×2)
 * "W jednym elemencie uporządkowanych danych użyto co najmniej dwóch wykluczających się wzajemnie właściwości"
 
@@ -341,7 +351,7 @@ Aby pole `address` rzeczywiście pojawiło się w JSON-LD: wypełnij **WP Admin 
 = 2.4.11 =
 **Field_Resolver: @type stamping na deliveryTime/handlingTime/transitTime + returnShippingFeesAmount + unitCode DAY.**
 
-Rich Results Test flag'ował na produkcji makumi.eu po 2.4.10:
+Rich Results Test flag'ował po 2.4.10 na sklepie WooCommerce:
 * "Nieprawidłowy typ obiektu w polu handlingTime (opcjonalnie)"
 * "Nieprawidłowy typ obiektu w polu transitTime (opcjonalnie)"
 * "Brakujące pole returnShippingFeesAmount (opcjonalnie)"
@@ -584,7 +594,7 @@ Drop-in upgrade from 2.3.x. Existing `ligase_*` meta keys still read; new fields
 = 2.3.3 =
 **Critical fix: schema for the wrong page on themes/plugins that call query_posts().**
 
-Diagnosed live on makumi.eu (XStore theme + WooCommerce + Yoast SEO 27.7): single
+Diagnosed live on a WooCommerce store (XStore theme + Yoast SEO 27.7): single
 product pages received CollectionPage schema with a CATEGORY url, no Product node.
 Root cause: the XStore theme calls `query_posts()` before `wp_head` priority 5
 fires, corrupting `is_single()` / `is_tax()` / `get_the_ID()` so that Ligase's

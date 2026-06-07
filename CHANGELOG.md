@@ -5,6 +5,46 @@ Wszystkie istotne zmiany w projekcie Ligase.
 Format oparty na [Keep a Changelog](https://keepachangelog.com/pl/1.1.0/).
 Wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
+Pełne, szczegółowe release notes — w pliku [`readme.txt`](readme.txt) (WordPress format).
+
+## [2.4.22] - 2026-06-07
+
+### Dodane
+- **PodcastSeries schema** (2.4.19): nowy typ dla landing-page hub'u podcastu (Spotify / Apple / YouTube `sameAs`, `webFeed` RSS, `numberOfEpisodes`).
+- **Person — Personal Brand Pack** (2.4.18-19): pięć nowych pól repeater na profilu autora — `worksFor` external, `affiliation`, `subjectOf`, `workExperience` → `worksFor` array z OrganizationRole (role-property pattern schema.org), `award`, `agentInteractionStatistic` (InteractionCounter z YouTube / Spotify / LinkedIn — manual-action ostrzeżenie w UI dla wymyślonych liczb).
+- **Google open-web popularity badges** (2.4.20): meta-box pokazuje obok każdego typu schema kolorową odznakę z bucket'em adopcji (`10M+` / `1M-10M` / `100K-1M` / `10K-100K` / `1K-10K`) z `schemaorg/schemaorg/data/public_stats/google/2026_05.csv`.
+- **`Ligase_Popularity_Stats`** klasa static — API: `bucket($type)`, `tier($type)`, `badge_html($type)`. Refresh co ~6 miesięcy.
+- **Smart schema-type detection** (2.4.10) w listingu admina: page slug/title heuristics → `AboutPage` / `ContactPage` / `CheckoutPage` / `CollectionPage` / `FAQPage` / `WebPage`.
+- **OPcache auto-reset** (2.4.10) na `register_activation_hook` + `upgrader_process_complete`.
+- **Output-buffer scrubbing** (2.4.13-14): w `standalone_mode` ON, `ob_start` callback strip'uje obce `<script type="application/ld+json">` z BreadcrumbList / Article / Product injectowane przez WooCommerce theme'y (XStore / Flatsome / Woodmart).
+- **Audytor `@graph` unwrap** (2.4.17): każdy węzeł `@graph` oceniany osobno + dobierany do post_type.
+- **Persistencja tabbed settings** (2.4.14): hidden-input pattern + `array_key_exists()` w `sanitize()`.
+- Doc: `docs/google-stats-coverage-2026-05.md` — coverage map Ligase vs Google open-web stats + roadmap 2.5.x.
+
+### Naprawione (krytyczne)
+- **Score 0/100 dla wszystkich postów** (2.4.8) — 4 typo'y kluczy opcji w `Ligase_Score` (`organization_name` → `org_name` itp.) + 3 ghost-key readów.
+- **`shippingDetails` na OnlineStore — Schema Validator reject** (2.4.10): property dozwolona TYLKO na Offer. Każdy Product Offer inline'uje site-level shipping.
+- **`SearchAction.target` URL-encoded** (2.4.10) — `home_url()` łamało Sitelinks Search Box.
+- **`workExperience` na Person nie istnieje w schema.org** (2.4.22) — migrate do `worksFor` array z OrganizationRole.
+- **`returnPolicyCategory` + `refundType` + `returnShippingFeesAmount`** (2.4.10-13) brakujące pola MerchantReturnPolicy.
+- **`@type` stamping na `handlingTime` / `transitTime`** (2.4.11): `QuantitativeValue` + `ShippingDeliveryTime` + `unitCode: DAY`.
+- **ItemList karuzele — wykluczające się `url` + `item`** (2.4.15-16).
+- **`case 'page'` generatora nie wywoływał optional types** (2.4.21).
+- **`Suppressor::is_active()`** static state leak w FPM workers — czyta opcję fresh.
+- **VideoObject / WC unknown stock / JobPosting addressCountry** — wszystkie validation fixes.
+
+### Naprawione (bezpieczeństwo)
+- **Export settings leakuje `ner_api_key` + GSC service account JSON** (2.4.8) — `__REDACTED__`.
+- **`javascript:` URL filter** w textareas użytkownika.
+- **`_ligase_override` type whitelist** w `save_meta_box`.
+- **`bulk_set_flags`** per-post `edit_post` capability check.
+
+### Zmienione
+- `worksFor` na Person — gdy `ligase_works_for_name` ustawiony, override `@id` ref do site Organization na inline Organization.
+
+### Usunięte
+- `Ligase_Auditor::intercept()` (2.4.10) — deprecated jako no-op.
+
 ## [2.0.0] - 2026-03-29
 
 ### Dodane — Google Search Console

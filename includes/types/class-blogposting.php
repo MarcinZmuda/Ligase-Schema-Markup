@@ -14,7 +14,7 @@ class Ligase_Type_BlogPosting {
      *   2. Per-user `ligase_is_redakcja` meta → only this specific user is
      *      treated as Organization. For mixed sites where most authors are
      *      real people but one or two accounts represent a team byline like
-     *      "Redakcja MAKUMI" or "Sales Team".
+     *      "Redakcja" / "Zespół" / "Sales Team" accounts.
      *
      * Both paths route the author to `#org` so the graph stays consistent:
      * author = publisher = Organization. The corresponding Person node is

@@ -10,7 +10,7 @@
   <a href="https://wordpress.org/"><img src="https://img.shields.io/badge/WordPress-6.0%2B-blue?logo=wordpress" alt="WordPress"></a>
   <a href="https://www.php.net/"><img src="https://img.shields.io/badge/PHP-8.0%2B-777BB4?logo=php&logoColor=white" alt="PHP"></a>
   <a href="https://www.gnu.org/licenses/gpl-2.0.html"><img src="https://img.shields.io/badge/License-GPLv2-green.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/version-2.3.2-orange.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.4.22-orange.svg" alt="Version">
 </p>
 
 ---
@@ -23,29 +23,41 @@ Ligase generates a single consolidated `@graph` of schema.org JSON-LD for every 
 
 ---
 
-## What's new in 2.3.0
+## What's new in 2.4.x
 
-- **Three new high-value schema types:** `Recipe` (host-carousel-eligible), `JobPosting` (Google Jobs), `DiscussionForumPosting` (bbPress / Discussions & Forums SERP).
-- **WooCommerce merchant listings** — `Product` + `Offer` + `MerchantReturnPolicy` (with `returnPolicyCountry` required since March 2025) + `OfferShippingDetails`, plus `ProductGroup` + `hasVariant` for size/color variants and `SalePrice`/`StrikethroughPrice` for SERP strikethrough pricing.
-- **Field-contract system** — every schema field declares its required level, source chain (manual → WC → post → option → ref → NER → derive), and sanitization rule in one declarative file. Auto-fill happens at render time; manual overrides are persisted but auto values never are. Powers the in-editor **readiness panel** that shows which rich results the post qualifies for and why.
-- **OnlineStore mode** — site-level return + shipping policies emitted once on the Organization node; product Offers reference them by `@id` instead of repeating the full policy. Massive payload reduction on big catalogs.
-- **Hardening:** stored XSS in JSON-LD output fixed (literal `</script>` neutralized by both `str_replace` AND dropping `JSON_UNESCAPED_SLASHES`); capability split between admin and editor AJAX endpoints; logger now safe to leak regardless of webserver (PHP-die prefix + `.php` extension + `web.config`).
+- **PodcastSeries schema** (2.4.19) — landing-page hub markup for podcast websites. Per-page opt-in with `sameAs` (Spotify / Apple Podcasts / YouTube), `webFeed` (RSS), `numberOfEpisodes`. Author resolved through the shared `BlogPosting::author_ref_id()` so `org_author_mode` + `ligase_is_redakcja` decisions apply.
+- **Person extension — personal-brand SEO pack** (2.4.18-19): five new repeater fields per author profile —
+  - `worksFor` external (override Organization `@id` ref with your own firm)
+  - `affiliation` (loose ties — advisory, partnerships)
+  - `subjectOf` (cross-link to external interviews / write-ups where you're the topic)
+  - `workExperience` → emitted as schema.org-canonical role-property pattern inside `worksFor` array
+  - `award` (recognition with optional issuer + year)
+  - `agentInteractionStatistic` (InteractionCounter — YouTube subs, Spotify plays, LinkedIn followers — AI/LLM authority signal)
+- **Smart schema-type detection in admin** (2.4.10) — Pages auto-classify by slug + title heuristics: Kontakt → `ContactPage`, O nas → `AboutPage`, Koszyk → `CheckoutPage`, Sklep → `CollectionPage`, FAQ → `FAQPage`, plus heuristics for blog hubs.
+- **Google open-web popularity badges** (2.4.20) — meta-box shows next to every schema type a color-coded badge with adoption tier (`10M+`, `1M-10M`, `100K-1M`, `10K-100K`, `1K-10K`) sourced from `schemaorg/schemaorg` public stats. Helps users decide whether enabling a niche type makes sense for their site.
+- **Schema.org Validator compliance** (2.4.22) — `worksFor` array now uses canonical role-property pattern (`OrganizationRole` with nested `worksFor`, not non-standard `workExperience`). Plus `refundType` + `returnShippingFeesAmount` on `MerchantReturnPolicy`, `@type` stamping for `handlingTime`/`transitTime` (`QuantitativeValue` with `unitCode: DAY`), and `image` + `address` on `Organization`/`OnlineStore` for "Firmy lokalne" / Local Business Google check.
+- **Output-buffer scrubbing** (2.4.13-14) — when `standalone_mode` is on, an `ob_start` callback strips foreign `BreadcrumbList` / `Article` / `Product` JSON-LD scripts injected by themes (XStore, Flatsome, Woodmart) that filter hooks can't catch. Idempotent: leaves Ligase's own `@graph` block untouched.
+- **Multi-agent code audit fixes** (2.4.8-9) — 30+ production bugs fixed: score-killer typos (`organization_name` → `org_name` across 7 places), `shippingDetails` removed from `OnlineStore` (invalid in schema.org), URL-template encoding fix for `SearchAction.target` (Google's Sitelinks Search Box), JobPosting country code validation, VideoObject empty-field gate, `has_published_posts` deprecated-API fix, secret redaction in settings export, suppressor static-state leak, Polish/EU number formatting (`"1 299,90 zł"` → `1299.9`).
+- **OPcache auto-reset** (2.4.10) — fires on plugin activation and `upgrader_process_complete`. Eliminates the regression class where shared-host PHP-FPM kept the old compiled `sanitize()` whitelist, causing newly added checkboxes to silently revert on Save.
+- **Tabbed settings persistence** (2.4.14) — hidden-input pattern + `array_key_exists()` in `sanitize()` so saving one tab no longer wipes checkboxes in other tabs.
+- **Audytor `@graph` unwrap** (2.4.17) — auditor now reads each `@graph` node separately and picks the relevant one by post type, instead of scoring the envelope (which produced 0/100 across all posts).
 
-Full release notes: [`readme.txt`](readme.txt). Architectural history: [`docs/audit-history/`](docs/audit-history/).
+Full release notes: [`readme.txt`](readme.txt). Architectural history: [`docs/audit-history/`](docs/audit-history/). Data-driven coverage analysis: [`docs/google-stats-coverage-2026-05.md`](docs/google-stats-coverage-2026-05.md).
 
 ---
 
-## Schema types (v2.3.0)
+## Schema types (v2.4.22 — 25 types)
 
-### Publishing
+### Publishing & authorship
 | Type | Notes |
 |---|---|
 | `BlogPosting` / `Article` / `NewsArticle` / `TechArticle` / `LiveBlogPosting` | Category → variant resolver; headline ≤ 110; 3 image ratios (1:1, 4:3, 16:9); paywall (`isAccessibleForFree`); dateModified discipline; NewsArticle `citation` + `dateline`. |
-| `Person` + `ProfilePage` | `sameAs` (Wikidata/LinkedIn), `knowsAbout`, `alumniOf`, `hasCredential`, `worksFor` → Organization. |
-| `Organization` / `OnlineStore` | Logo 112×112+ (Google 2025 requirement), `sameAs`, `knowsAbout`, store-level `hasMerchantReturnPolicy` + `shippingDetails`. |
-| `LocalBusiness` | 60 supported subtypes with structured `openingHoursSpecification`. |
-| `WebSite` | `SearchAction`. |
-| `BreadcrumbList` | Full hierarchy with parent pages. |
+| `Person` + `ProfilePage` | 18 E-E-A-T fields: `givenName`/`familyName`/`honorificPrefix`, `jobTitle`, `description`, `image`, `knowsAbout`/`knowsLanguage`, `alumniOf` (EducationalOrganization), `hasCredential` repeater, `memberOf` repeater, `worksFor` (Organization or `@id` ref to site), `affiliation` repeater, `subjectOf` (external Articles), `workExperience` → `worksFor` array of OrganizationRole (role-property pattern), `award`, `agentInteractionStatistic` (InteractionCounter), `sameAs` (Wikidata/LinkedIn/Wikipedia/ORCID + WP contact methods). |
+| `Organization` / `OnlineStore` | Logo 112×112+ (Google 2025), `image`, `address` (PostalAddress), `sameAs`, `knowsAbout`, `email`, `telephone`, `contactPoint`, `founder` (Person `@id`), `employee[]` (up to 20 published authors), store-level `hasMerchantReturnPolicy` with `refundType` + `returnShippingFeesAmount`. |
+| `PodcastSeries` | Landing-page hub (`/podcast/`). Per-page opt-in with `name`, `description`, `image`, `sameAs` (Spotify / Apple / YouTube), `webFeed`, `numberOfEpisodes`, `inLanguage` BCP-47. Author resolved via centralized `author_ref_id`. |
+| `LocalBusiness` | 60+ supported subtypes via dropdown (ProfessionalService, Store, Restaurant, RealEstateAgent, etc.) with structured `openingHoursSpecification`, `geo` (GeoCoordinates), `priceRange`, `areaServed`, `hasMap`. |
+| `WebSite` | `SearchAction` (Sitelinks Search Box — proper URL template encoding). |
+| `BreadcrumbList` | Full hierarchy with parent pages + theme-injected duplicates scrubbed in standalone mode. |
 
 ### E-commerce
 | Type | Notes |
@@ -210,7 +222,7 @@ add_filter( 'ligase_readiness_panel_types', function ( array $types, int $post_i
 }, 10, 2 );
 ```
 
-Available type filters: `ligase_blogposting`, `ligase_person`, `ligase_organization`, `ligase_website`, `ligase_breadcrumb`, `ligase_product`, `ligase_productgroup`, `ligase_recipe`, `ligase_jobposting`, `ligase_discussionforumposting`.
+Available type filters: `ligase_blogposting`, `ligase_person`, `ligase_organization`, `ligase_website`, `ligase_breadcrumb`, `ligase_product`, `ligase_productgroup`, `ligase_recipe`, `ligase_jobposting`, `ligase_discussionforumposting`, `ligase_podcastseries`, `ligase_service`, `ligase_event`, `ligase_faqpage`, `ligase_howto`, `ligase_review`, `ligase_localbusiness`.
 
 ### WP-CLI helper
 

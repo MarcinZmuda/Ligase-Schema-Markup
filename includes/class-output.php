@@ -16,9 +16,11 @@ class Ligase_Output {
         // Build a unique cache key from the QUERIED OBJECT (set once when the main
         // query parses) rather than get_the_ID() (which reads $GLOBALS['post'] and
         // can be hijacked by themes/plugins calling query_posts() before wp_head).
-        // Without this, makumi.eu-style "queried object is product but get_the_ID
-        // returns 0 because XStore corrupted globals" produced an archive cache key
-        // for the category, then served stale category schema on every product hit.
+        // Without this, the "queried object is product but get_the_ID returns 0
+        // because the theme corrupted globals" case produced an archive cache
+        // key for the category, then served stale category schema on every
+        // product hit. Common with WooCommerce themes that call query_posts()
+        // before wp_head fires.
         $queried = get_queried_object();
         if ( $queried instanceof WP_Post ) {
             $cache_key = 'ligase_' . (int) $queried->ID . '_' . get_locale() . '_' . LIGASE_VERSION;
