@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.21
+Stable tag: 2.4.22
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,30 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.22 =
+**Schema.org Validator dwa errors w Person: `workExperience` + OrganizationRole `memberOf`.**
+
+Wykryte przez validator.schema.org na marcinzmuda.com po wdrożeniu 2.4.21. Dwa nonstandard używania właściwości które wynikały z błędnego planu specyfikacji (mojego, w przygotowaniu Person pack w 2.4.18):
+
+**1. `workExperience` jako property na `Person` — nie istnieje w schema.org.** Validator zgłaszał: "Właściwość workExperience nie została rozpoznana przez schemat jako część obiektu typu Person." Ja założyłem że to standard property, ale schema.org tej property po prostu nie ma na Person — istnieje `worksFor`, `hasOccupation`, ale nie `workExperience`.
+
+**2. `memberOf` wewnątrz `OrganizationRole` — niewłaściwa property dla role-property pattern.** Validator zgłaszał: "Właściwość memberOf nie została rozpoznana przez schemat jako część obiektu typu OrganizationRole." OrganizationRole jako qualifier roli wymaga REKURSYWNEJ tej samej property co kontener — czyli wewnątrz worksFor.OrganizationRole MUSI być `worksFor` (znowu), nie `memberOf`.
+
+**Fix:** historia kariery (`ligase_work_experience`) trafia teraz do **jednego `worksFor` array** obok current employer'a:
+
+```json
+"worksFor": [
+  {"@type":"Organization","name":"Embasy","url":"..."},
+  {"@type":"OrganizationRole","roleName":"Head of SEO","startDate":"2015-11","endDate":"2024-12",
+   "worksFor":{"@type":"Organization","name":"Orion Media Group"}},
+  ...
+]
+```
+
+To jest schema.org-canonical "role-property pattern" — Google docs explicite go wymienia jako sposób kwalifikacji relacji + dat. validator.schema.org czyste; LinkedIn Author Cards używają tej samej struktury.
+
+`workExperience` property jest dropowana całkowicie (była nonstandard od początku). Dane z `ligase_work_experience` user_meta są bez migracji — parser je czyta jak wcześniej, tylko output property name się zmienia z `workExperience` na unified `worksFor`.
 
 = 2.4.21 =
 **Generator: case 'page' nie wywoływał optional types — wszystkie opt-in typy na pages nie emitowały się.**

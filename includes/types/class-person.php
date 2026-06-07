@@ -181,19 +181,28 @@ class Ligase_Type_Person {
         // who run their own firm (kancelaria / consulting) can override with an
         // external Organization. Without override, the @id reference saves payload
         // and consolidates the publisher entity across the graph.
+        //
+        // Past employers from ligase_work_experience merge into this same array
+        // using schema.org's "role property" pattern — each past role becomes an
+        // OrganizationRole whose own `worksFor` points at the past Organization.
+        // This is the documented way to express "employed as Role at Org from X
+        // to Y" without inventing nonstandard properties like `workExperience`
+        // (which schema.org doesn't have on Person — earlier Ligase versions
+        // emitted it and validator.schema.org flagged it as unrecognised).
+        $works_for_list = array();
         $ext_works_name = (string) get_user_meta( $this->user_id, 'ligase_works_for_name', true );
         $ext_works_url  = (string) get_user_meta( $this->user_id, 'ligase_works_for_url',  true );
         if ( $ext_works_name !== '' ) {
-            $works_for = [
+            $current = array(
                 '@type' => 'Organization',
                 'name'  => wp_strip_all_tags( $ext_works_name ),
-            ];
+            );
             if ( $ext_works_url !== '' ) {
-                $works_for['url'] = esc_url( $ext_works_url );
+                $current['url'] = esc_url( $ext_works_url );
             }
-            $schema['worksFor'] = $works_for;
+            $works_for_list[] = $current;
         } else {
-            $schema['worksFor'] = [ '@id' => home_url( '/#org' ) ];
+            $works_for_list[] = array( '@id' => home_url( '/#org' ) );
         }
 
         // affiliation — loose ties (industry associations, advisory boards) where
@@ -214,14 +223,19 @@ class Ligase_Type_Person {
             $schema['subjectOf'] = count( $subject_of ) === 1 ? $subject_of[0] : $subject_of;
         }
 
-        // workExperience — structured career history as OrganizationRole. More
-        // expressive than a single jobTitle string, useful for personal-brand sites.
-        // Format per line: "Role | Org name | Org URL | startYear | endYear?".
+        // Past employers — appended to worksFor as OrganizationRole entries using
+        // schema.org's role-property pattern. Format per line:
+        //   "Role | Org name | Org URL | startYear | endYear?"
+        // Each line becomes:
+        //   {"@type":"OrganizationRole","roleName":"...","startDate":"...",
+        //    "endDate":"...","worksFor":{"@type":"Organization","name":"..."}}
+        // Validator.schema.org accepts this; LinkedIn Author cards use the same shape.
         $we_raw     = (string) get_user_meta( $this->user_id, 'ligase_work_experience', true );
         $experience = $this->parse_work_experience( $we_raw );
-        if ( ! empty( $experience ) ) {
-            $schema['workExperience'] = count( $experience ) === 1 ? $experience[0] : $experience;
+        foreach ( $experience as $role ) {
+            $works_for_list[] = $role;
         }
+        $schema['worksFor'] = count( $works_for_list ) === 1 ? $works_for_list[0] : $works_for_list;
 
         // award — recognition received from external bodies. Plain string per line,
         // or "Name | Issuer | year" for structured awards. Falls back to string array
@@ -495,10 +509,15 @@ class Ligase_Type_Person {
             if ( $org_url !== '' ) {
                 $org_node['url'] = esc_url( $org_url );
             }
+            // Role-property pattern: OrganizationRole nests `worksFor` (not
+            // `memberOf`) which is the schema.org-canonical way to qualify the
+            // worksFor relation with a role + date range. validator.schema.org
+            // accepts this; earlier versions used `memberOf` here and the
+            // validator flagged it as not part of OrganizationRole.
             $role_node = [
                 '@type'    => 'OrganizationRole',
                 'roleName' => wp_strip_all_tags( $role ),
-                'memberOf' => $org_node,
+                'worksFor' => $org_node,
             ];
             if ( preg_match( '/^\d{4}(-\d{2}(-\d{2})?)?$/', $start ) ) {
                 $role_node['startDate'] = $start;
