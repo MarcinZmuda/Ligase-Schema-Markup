@@ -10,7 +10,8 @@
   <a href="https://wordpress.org/"><img src="https://img.shields.io/badge/WordPress-6.0%2B-blue?logo=wordpress" alt="WordPress"></a>
   <a href="https://www.php.net/"><img src="https://img.shields.io/badge/PHP-8.0%2B-777BB4?logo=php&logoColor=white" alt="PHP"></a>
   <a href="https://www.gnu.org/licenses/gpl-2.0.html"><img src="https://img.shields.io/badge/License-GPLv2-green.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/version-2.4.22-orange.svg" alt="Version">
+  <a href="https://github.com/MarcinZmuda/Ligase-Schema-Markup/releases/latest"><img src="https://img.shields.io/github/v/release/MarcinZmuda/Ligase-Schema-Markup?label=release&color=orange" alt="Latest release"></a>
+  <a href="https://github.com/MarcinZmuda/Ligase-Schema-Markup/releases"><img src="https://img.shields.io/github/release-date/MarcinZmuda/Ligase-Schema-Markup?label=last%20release" alt="Last release date"></a>
 </p>
 
 ---
