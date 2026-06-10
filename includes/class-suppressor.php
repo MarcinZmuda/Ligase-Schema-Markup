@@ -110,6 +110,29 @@ class Ligase_Suppressor {
             ],
             'jsonld_marker' => 'slim-seo',
         ],
+        'woocommerce_core' => [
+            // WooCommerce since 7.2 emits its own JSON-LD @graph (Product +
+            // AggregateOffer + BreadcrumbList) directly via wp_footer, not
+            // through any SEO plugin's hooks. On stores where Ligase already
+            // emits a richer Product node, this duplicates schema and triggers
+            // "Zduplikowane pole brand" + "Nieprawidlowy typ obiektu w polu
+            // offers" in Rich Results Test (when Ligase emits Offer while WC
+            // emits AggregateOffer for variable products).
+            //
+            // The four wc_structured_data_* filters wired here let WC build an
+            // empty array for each known schema type, so the actual <script>
+            // is rendered with `[]` and Google ignores it. The output-buffer
+            // scrubber then strips even that empty fragment in standalone mode.
+            'name'    => 'WooCommerce (core JSON-LD)',
+            'detect'  => [ 'WC_VERSION', 'WooCommerce' ],
+            'filters' => [
+                [ 'woocommerce_structured_data_product',        '__return_empty_array' ],
+                [ 'woocommerce_structured_data_review',         '__return_empty_array' ],
+                [ 'woocommerce_structured_data_breadcrumblist', '__return_empty_array' ],
+                [ 'woocommerce_structured_data_website',        '__return_empty_array' ],
+            ],
+            'jsonld_marker' => 'woocommerce',
+        ],
     ];
 
     /**

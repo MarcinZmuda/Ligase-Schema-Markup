@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.23
+Stable tag: 2.4.24
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,25 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.24 =
+**Suppressor: dodano WooCommerce core JSON-LD (eliminuje "Zduplikowane pole brand" + "Nieprawidłowy typ obiektu w polu offers" w sklepach z wariantami).**
+
+WooCommerce od wersji 7.2 emituje **własne** JSON-LD `@graph` (Product + AggregateOffer + BreadcrumbList) bezpośrednio przez `wp_footer` — niezależnie od jakiegokolwiek pluginu SEO. W sklepach gdzie Ligase już emituje pełny Product node, ten drugi blok produkuje na Rich Results Test krytyczny błąd "Zduplikowane pole brand" (Ligase emit "MAKUMI Sp. z o.o" + WC emit "Makumi"), plus ostrzeżenie "Nieprawidłowy typ obiektu w polu offers" (Ligase Offer + WC AggregateOffer dla produktów wariantowych).
+
+Wcześniej Suppressor wyciszał TYLKO Yoast / RankMath / AIOSEO / SEOPress / The SEO Framework / Slim SEO / The Events Calendar — WooCommerce core nie był na liście, bo to nie jest "plugin SEO".
+
+Naprawione: nowy wpis `woocommerce_core` w `KNOWN_PLUGINS` z 4 filterami:
+* `woocommerce_structured_data_product` → `__return_empty_array`
+* `woocommerce_structured_data_review` → `__return_empty_array`
+* `woocommerce_structured_data_breadcrumblist` → `__return_empty_array`
+* `woocommerce_structured_data_website` → `__return_empty_array`
+
+Aktywne tylko gdy `standalone_mode` ON (jak wszystkie inne suppressor hooks). Detekcja przez `WC_VERSION` constant lub `WooCommerce` class.
+
+Plus output-buffer scrubber (z 2.4.13) dodatkowo wycina nawet pusty fragment `<script type="application/ld+json">[]</script>` który WC może wciąż wyrenderować po filterze.
+
+Po wgraniu na sklep WooCommerce + standalone_mode ON: **Rich Results Test pokaże tylko jeden blok Ligase, zero duplikatów brand, czysta Offer struktura** (zamiast AggregateOffer).
 
 = 2.4.23 =
 **Sprzątanie dokumentacji — neutralne przykłady + README/CHANGELOG sync.**
