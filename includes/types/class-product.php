@@ -256,7 +256,7 @@ class Ligase_Type_Product {
 
         $offer = [
             '@type'         => 'Offer',
-            'price'         => (string) (float) $data['price'],
+            'price'         => Ligase_Price::to_string( $data['price'] ),
             'priceCurrency' => $currency,
             'availability'  => 'https://schema.org/' . $availability,
             'itemCondition' => 'https://schema.org/' . $condition,
@@ -267,18 +267,18 @@ class Ligase_Type_Product {
         // Sale price — when both regular and sale prices exist, emit priceSpecification
         // with SalePrice + StrikethroughPrice so Google shows a strikethrough in the SERP.
         // The base `price` stays as the sale price so price filters in Shopping work.
-        if ( isset( $data['regular_price'] ) && (float) $data['regular_price'] > (float) $data['price'] ) {
+        if ( isset( $data['regular_price'] ) && Ligase_Price::to_number( $data['regular_price'] ) > Ligase_Price::to_number( $data['price'] ) ) {
             $offer['priceSpecification'] = [
                 [
                     '@type'         => 'UnitPriceSpecification',
                     'priceType'     => 'https://schema.org/SalePrice',
-                    'price'         => (string) (float) $data['price'],
+                    'price'         => Ligase_Price::to_string( $data['price'] ),
                     'priceCurrency' => $currency,
                 ],
                 [
                     '@type'         => 'UnitPriceSpecification',
                     'priceType'     => 'https://schema.org/StrikethroughPrice',
-                    'price'         => (string) (float) $data['regular_price'],
+                    'price'         => Ligase_Price::to_string( $data['regular_price'] ),
                     'priceCurrency' => $currency,
                 ],
             ];
@@ -326,7 +326,7 @@ class Ligase_Type_Product {
                 '@type'              => 'OfferShippingDetails',
                 'shippingRate'       => [
                     '@type'    => 'MonetaryAmount',
-                    'value'    => (string) (float) $data['shipping_rate'],
+                    'value'    => Ligase_Price::to_string( $data['shipping_rate'] ),
                     'currency' => $shipping_currency,
                 ],
                 'shippingDestination' => [

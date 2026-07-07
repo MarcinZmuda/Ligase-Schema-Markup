@@ -206,7 +206,7 @@ class Ligase_Type_Service {
 		);
 
 		if ( $price !== '' ) {
-			$offer['price'] = (string) (float) $price;
+			$offer['price'] = Ligase_Price::to_string( $price );
 		} else {
 			// Range — use PriceSpecification with min/max
 			$range_spec = array(
@@ -214,12 +214,12 @@ class Ligase_Type_Service {
 				'priceCurrency' => $currency,
 			);
 			if ( $price_low !== '' ) {
-				$range_spec['minPrice'] = (string) (float) $price_low;
+				$range_spec['minPrice'] = Ligase_Price::to_string( $price_low );
 				// Also set `price` to the low end so Google has a baseline figure.
-				$offer['price'] = (string) (float) $price_low;
+				$offer['price'] = Ligase_Price::to_string( $price_low );
 			}
 			if ( $price_high !== '' ) {
-				$range_spec['maxPrice'] = (string) (float) $price_high;
+				$range_spec['maxPrice'] = Ligase_Price::to_string( $price_high );
 			}
 			$offer['priceSpecification'] = $range_spec;
 		}

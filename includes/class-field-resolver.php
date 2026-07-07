@@ -441,29 +441,8 @@ final class Ligase_Field_Resolver {
 				// Strategy: strip currency symbols/spaces/letters, then normalise the
 				// decimal separator. We assume the LAST comma or dot is the decimal,
 				// any earlier are thousands separators to remove.
-				if ( is_string( $value ) ) {
-					$clean = preg_replace( '/[^\d,\.\-]/', '', $value );
-					if ( $clean === '' || $clean === '-' ) {
-						return 0.0;
-					}
-					$last_comma = strrpos( $clean, ',' );
-					$last_dot   = strrpos( $clean, '.' );
-					$dec_pos = false;
-					if ( $last_comma !== false && $last_dot !== false ) {
-						$dec_pos = max( $last_comma, $last_dot );
-					} elseif ( $last_comma !== false ) {
-						$dec_pos = $last_comma;
-					} elseif ( $last_dot !== false ) {
-						$dec_pos = $last_dot;
-					}
-					if ( $dec_pos === false ) {
-						return (float) $clean;
-					}
-					$int_part  = preg_replace( '/[^\d\-]/', '', substr( $clean, 0, $dec_pos ) );
-					$frac_part = preg_replace( '/[^\d]/', '',  substr( $clean, $dec_pos + 1 ) );
-					return (float) ( $int_part . '.' . $frac_part );
-				}
-				return (float) $value;
+				// Shared with the legacy (resolver-less) type builders via Ligase_Price.
+				return Ligase_Price::to_number( $value );
 			case 'date':
 				if ( is_string( $value ) && $value !== '' ) {
 					$ts = strtotime( $value );
