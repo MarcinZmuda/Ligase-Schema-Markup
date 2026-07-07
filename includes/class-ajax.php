@@ -793,60 +793,21 @@ class Ligase_Ajax {
 
 				foreach ( $repairs as $repair ) {
 					try {
-						$schema_json = get_post_meta( $post_id, '_ligase_schema', true );
-
-						if ( empty( $schema_json ) ) {
+						// Ligase generates JSON-LD live at wp_head (cached in a transient), so
+						// there is no stored schema blob to rewrite. The old code read a
+						// `_ligase_schema` meta that nothing ever writes, so every repair
+						// silently did nothing. Operate on the real per-post override instead.
+						//
+						// fix_dates / truncate_headlines need no work: the builder already
+						// emits ISO-8601 dates (get_the_date('c')) and truncates headlines to
+						// <=110 chars at generation time.
+						if ( $repair !== 'convert_article_to_blogposting' ) {
 							continue;
 						}
 
-						$schema  = json_decode( $schema_json, true );
-						$changed = false;
-
-						switch ( $repair ) {
-							case 'fix_dates':
-								if ( ! empty( $schema['datePublished'] ) ) {
-									$timestamp = strtotime( $schema['datePublished'] );
-									if ( $timestamp ) {
-										$iso_date = gmdate( 'Y-m-d\TH:i:sP', $timestamp );
-										if ( $schema['datePublished'] !== $iso_date ) {
-											$schema['datePublished'] = $iso_date;
-											$changed                 = true;
-										}
-									}
-								}
-								if ( ! empty( $schema['dateModified'] ) ) {
-									$timestamp = strtotime( $schema['dateModified'] );
-									if ( $timestamp ) {
-										$iso_date = gmdate( 'Y-m-d\TH:i:sP', $timestamp );
-										if ( $schema['dateModified'] !== $iso_date ) {
-											$schema['dateModified'] = $iso_date;
-											$changed                = true;
-										}
-									}
-								}
-								break;
-
-							case 'truncate_headlines':
-								if ( ! empty( $schema['headline'] ) && mb_strlen( $schema['headline'] ) > 110 ) {
-									$schema['headline'] = mb_substr( $schema['headline'], 0, 110 );
-									$changed            = true;
-								}
-								break;
-
-							case 'convert_article_to_blogposting':
-								if ( ! empty( $schema['@type'] ) && 'Article' === $schema['@type'] ) {
-									$schema['@type'] = 'BlogPosting';
-									$changed         = true;
-								}
-								break;
-						}
-
-						if ( $changed ) {
-							update_post_meta(
-								$post_id,
-								'_ligase_schema',
-								wp_json_encode( $schema, JSON_UNESCAPED_UNICODE )
-							);
+						if ( get_post_meta( $post_id, '_ligase_schema_type', true ) === 'Article' ) {
+							update_post_meta( $post_id, '_ligase_schema_type', 'BlogPosting' );
+							Ligase_Cache::invalidate_post_and_related( $post_id );
 							++$fixed;
 						}
 					} catch ( \Exception $e ) {
