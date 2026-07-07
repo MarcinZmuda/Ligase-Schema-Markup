@@ -1220,9 +1220,18 @@ class Ligase_Ajax {
 			return;
 		}
 
-		// Sanitize
+		// Sanitize. Note: the UI sends id="" (empty string, not null) for new
+		// rules, so `?? generate_id()` never fired — every new rule was saved with
+		// an empty id and the update/append loop below then overwrote the single
+		// id="" entry, making it impossible to store more than one rule (or delete
+		// one by id). Fall back to a generated id whenever it sanitizes to empty.
+		$rule_id = sanitize_key( $rule_data['id'] ?? '' );
+		if ( '' === $rule_id ) {
+			$rule_id = Ligase_Schema_Rules::generate_id();
+		}
+
 		$rule = array(
-			'id'              => sanitize_key( $rule_data['id'] ?? Ligase_Schema_Rules::generate_id() ),
+			'id'              => $rule_id,
 			'name'            => sanitize_text_field( $rule_data['name'] ?? '' ),
 			'condition_type'  => sanitize_key( $rule_data['condition_type'] ?? 'category' ),
 			'condition_value' => sanitize_text_field( $rule_data['condition_value'] ?? '' ),
