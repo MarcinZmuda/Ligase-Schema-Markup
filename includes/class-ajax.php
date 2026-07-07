@@ -707,7 +707,12 @@ class Ligase_Ajax {
 					$sanitized_options[ $key ] = sanitize_text_field( $value );
 				}
 			}
-			update_option( 'ligase_options', $sanitized_options );
+			// Merge onto the existing options instead of replacing them: the
+			// import whitelist deliberately omits secrets such as ner_api_key,
+			// so a wholesale update_option() wiped the stored NER API key (and any
+			// other non-exported key) on every settings import.
+			$existing_options = (array) get_option( 'ligase_options', array() );
+			update_option( 'ligase_options', array_merge( $existing_options, $sanitized_options ) );
 
 			// Import author meta.
 			if ( ! empty( $data['author_meta'] ) && is_array( $data['author_meta'] ) ) {
