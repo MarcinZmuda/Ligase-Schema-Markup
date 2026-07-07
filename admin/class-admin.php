@@ -92,9 +92,17 @@ class Ligase_Admin {
 				'slug'  => 'ligase-encje',
 				'cap'   => 'manage_options',
 			),
-			// "Narz\u0119dzia" submenu retired in 2.4.3 \u2014 actions moved to the Posty page
-			// (bulk schema flags) and Ustawienia (clear cache, import/export). The
-			// tools.php view itself stays on disk for back-compat with any deep links.
+			// "Narzedzia" submenu was retired in 2.4.3 on the assumption its actions
+			// had moved to the Posty and Ustawienia pages, but that migration never
+			// happened: the importer, validator, auto-repair, health report, cache
+			// clear and settings import/export live ONLY in tools.php. Removing the
+			// menu orphaned all six. Keep the page registered until they are actually
+			// relocated.
+			array(
+				'title' => __( 'Narzedzia', 'ligase' ),
+				'slug'  => 'ligase-narzedzia',
+				'cap'   => 'manage_options',
+			),
 		);
 	}
 
