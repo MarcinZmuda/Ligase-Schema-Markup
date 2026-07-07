@@ -165,3 +165,38 @@ Hot-path frontu jest **dobrze zaprojektowany**: transient cache 12 h, jedna auto
 **Sprint 3 — skala i higiena:** P1-P4 (batching + kolejka NER + GSC sync), P5-P6, S1 (szyfrowanie klucza NER), S5 (rotacja logów), cache na Redis (B-invalidate_all), locale w hookach Woo.
 
 **Sprint 4 — fundament wzrostu:** CI, golden testy, i18n English-first, split ajax, rejestr typów, potem roadmapa produktowa (ACF → rules-mapping → GSC alerting → wp.org).
+
+---
+
+## 7. Uzupełnienie — badanie dynamiczne (uruchomienie toolingu QA)
+
+Po audycie statycznym uruchomiono własny tooling projektu (PHPUnit 10, PHPCS + WPCS 3.3, PHPCompatibilityWP, PHPStan 2.1 level 5 z wordpress-stubs) na PHP 8.4.19 / PCRE2 10.42.
+
+### B17 (NOWY, HIGH) — regex `detect_places()` nie kompiluje się na PCRE2 < 10.43 → fatal TypeError przy każdej analizie encji
+
+`includes/entities/class-extractor-ner.php:248` — lookbehind `(?<=\b(?:w|we|na|z|ze|do|nad|pod|przy|in|at|from|near)\s)` ma gałęzie o różnej długości. PCRE2 wspiera lookbehind o zmiennej długości dopiero od **10.43** (luty 2024). Na PHP linkowanym z systemowym libpcre2 — **Debian 12 = 10.42, Ubuntu 22.04 = 10.39**, czyli duża część realnych hostingów — kompilacja pada („lookbehind assertion is not fixed length"), `preg_match_all()` zwraca `false`, `$matches` jest `null`, a `collect_matches( $matches[1] )` z typowanym parametrem `array` rzuca **niełapany TypeError** (fatal). Ścieżka wywołania: AJAX `ligase_scan_post` → `Ligase_Entity_Pipeline::analyze()` → `extract_from_post()` → `detect_places()` (`class-extractor-ner.php:162`). Potwierdzone trzema niezależnymi metodami: 7 testów PHPUnit pada dokładnie tym TypeError, PHPStan raportuje `regexp.pattern` dla tej linii, reprodukcja w izolacji potwierdza błąd kompilacji.
+Fix (usuwa też problem zależności od wersji PCRE): zamiast lookbehind użyć zwykłej grupy: `/\b(?:w|we|na|z|ze|do|nad|pod|przy|in|at|from|near)\s+((?:\p{Lu}\p{L}+)(?:\s+\p{Lu}\p{L}+){0,2})/u` i czytać grupę 1 (offsety w PREG_OFFSET_CAPTURE brać z grupy 1). Dodatkowo `collect_matches()` powinno bronić się przed `false`/`null` z `preg_match_all`.
+
+### Suite testowa realnie nie przechodzi — potwierdzenie pilności CI
+
+`vendor/bin/phpunit`: **26 errors + 2 failures na 57 testów**. Kategorie: 14× `Call to undefined function get_post_type()`, 4× `get_post_time()` (bootstrap testowy nie nadąża za kodem — stuby nie były aktualizowane), 7× TypeError z B17, 1× `AuditorTest` wymaga realnego pliku WP (`/tmp/wordpress/wp-admin/includes/plugin.php`). Plus 2 asercje: supplement nie dodaje `inLanguage` (spójne z B5 — supplement path działa na globalnym `$post`), score autora 80 zamiast ≥90. Wniosek: testy są martwe od dłuższego czasu; golden testy + CI (sekcja 4) to nie „nice to have", tylko warunek utrzymania jakości.
+
+### PHPCS (pełny ruleset WordPress z phpcs.xml.dist): 9 651 errors / 1 159 warnings w 64 plikach
+
+Zadeklarowany standard nigdy nie był egzekwowany. ~97% to auto-fixable formatowanie (6 478× wcięcia spacjami zamiast tabów, 534× short array syntax, wyrównania tablic) — jedno przejście `phpcbf` czyści większość. Merytorycznie istotne do przejrzenia przed wp.org: 53× `Security.NonceVerification.Missing`, 12× `InputNotSanitized`, 11× `EscapeOutput.OutputNotEscaped` — manualny audyt (sekcja 1) potwierdził, że kluczowe ścieżki są chronione centralnie (`verify_request()`), więc to głównie fałszywe alarmy sniffa, ale zespół recenzentów wordpress.org będzie wymagał adnotacji `phpcs:ignore` z uzasadnieniem albo refaktoru.
+
+### PHPCompatibility 8.0–8.4: czysto
+
+Zero błędów i ostrzeżeń dla zakresu PHP 8.0–8.4 (poza runtime'owym problemem PCRE z B17, którego sniffy nie widzą).
+
+### PHPStan level 5: 196 błędów (większość to szum braku stubów), niezależnie potwierdza znane bugi
+
+Realne sygnały: `regexp.pattern` dla B17, `staticMethod.notFound` dla B6 (`tools.php:17`), `argument.type` dla B-fix_post (`class-ajax.php:256`, sprintf z tablicą), martwa metoda `Ligase_Type_Organization::build_store_shipping()` (relikt fixa 2.4.10 — do usunięcia), `Ligase_Suppressor::$is_active` zapisywane, nigdy nie czytane (relikt fixa static-state). Szum do wyciszenia w konfiguracji: stałe wtyczki (`LIGASE_VERSION`, `*_IN_SECONDS`) i klasy WooCommerce wymagają dodania own-constants bootstrap + `php-stubs/woocommerce-stubs`; `deadCode.unreachable` po `wp_send_json_*` wymaga stubów z `never`.
+
+### Czego to badanie nadal nie objęło (wymaga środowiska/live site)
+
+1. **Test na żywej instalacji WP** — realny output @graph na różnych motywach (zwłaszcza XStore/Flatsome przy standalone mode) + Google Rich Results Test / Schema Markup Validator na wyemitowanym JSON-LD.
+2. **Plugin Check (PCP)** wordpress.org — formalny wymóg przed submission.
+3. **Testy integracyjne WooCommerce** (warianty, waluty, stany magazynowe) i WPML/Polylang na realnych danych.
+4. **Lint/analiza JS** (ESLint dla admin.js, gutenberg-sidebar.js, bloków) — poza zakresem uruchomionego toolingu.
+5. **Audyt zapytań SQL pod obciążeniem** (Query Monitor na dużej bazie) — szacunki z sekcji 3 warto zweryfikować empirycznie.
