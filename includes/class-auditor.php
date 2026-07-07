@@ -115,7 +115,13 @@ class Ligase_Auditor {
 			return $buffer;
 		}
 
-		$pattern = '/<script\s+type=["\']application\/ld\+json["\']\s*>(.*?)<\/script>/si';
+		// Match the ld+json script tag regardless of attribute order / extra
+		// attributes. Yoast emits class="yoast-schema-graph" and Rank Math
+		// class="rank-math-schema" after type=, which the previous
+		// type-must-be-the-only-attribute pattern silently skipped — making the
+		// competitor audit a no-op on the two most common schema plugins.
+		// Mirrors the tolerant pattern already used in Ligase_Suppressor.
+		$pattern = '/<script\b[^>]*\btype\s*=\s*["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/si';
 
 		if ( ! preg_match_all( $pattern, $buffer, $matches, PREG_SET_ORDER ) ) {
 			Ligase_Logger::info( "No JSON-LD blocks found for post {$post_id}." );
@@ -1154,7 +1160,10 @@ class Ligase_Auditor {
 			wp_reset_postdata();
 		}
 
-		$pattern = '/<script\s+type=["\']application\/ld\+json["\']\s*>(.*?)<\/script>/si';
+		// Attribute-order-tolerant match (see process_buffer note above): the
+		// batch scanner reads competitor / existing schema straight from wp_head,
+		// where Yoast and Rank Math both add a class= attribute after type=.
+		$pattern = '/<script\b[^>]*\btype\s*=\s*["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/si';
 
 		if ( ! preg_match_all( $pattern, $head, $matches ) ) {
 			return array();
