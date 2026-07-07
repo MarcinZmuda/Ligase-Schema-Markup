@@ -216,7 +216,7 @@ class Ligase_Plugin {
         if ( file_exists( $faq_path ) ) {
             register_block_type( LIGASE_DIR . 'blocks/faq/', [
                 'render_callback' => function( array $attrs, string $content, $block ): string {
-                    return '';
+                    return $this->render_faq_block( $attrs );
                 },
             ] );
         }
@@ -225,10 +225,82 @@ class Ligase_Plugin {
         if ( file_exists( $howto_path ) ) {
             register_block_type( LIGASE_DIR . 'blocks/howto/', [
                 'render_callback' => function( array $attrs, string $content, $block ): string {
-                    return '';
+                    return $this->render_howto_block( $attrs );
                 },
             ] );
         }
+    }
+
+    /**
+     * Render the FAQ block's visible HTML.
+     *
+     * The block previously rendered nothing while FAQPage JSON-LD was still
+     * emitted from post meta — structured data without matching on-page content,
+     * which Google treats as a spam signal (manual-action risk). Mirror the
+     * FAQPage builder exactly: question as plain text, answer as post HTML.
+     */
+    private function render_faq_block( array $attrs ): string {
+        $items = $attrs['items'] ?? [];
+        if ( ! is_array( $items ) || empty( $items ) ) {
+            return '';
+        }
+
+        $rows = '';
+        foreach ( $items as $item ) {
+            if ( ! is_array( $item ) || empty( $item['question'] ) || empty( $item['answer'] ) ) {
+                continue;
+            }
+            $rows .= sprintf(
+                '<div class="ligase-faq__item"><h3 class="ligase-faq__question">%s</h3><div class="ligase-faq__answer">%s</div></div>',
+                esc_html( $item['question'] ),
+                wp_kses_post( $item['answer'] )
+            );
+        }
+
+        if ( $rows === '' ) {
+            return '';
+        }
+
+        return '<div class="ligase-faq wp-block-ligase-faq">' . $rows . '</div>';
+    }
+
+    /**
+     * Render the HowTo block's visible HTML.
+     *
+     * Same rationale as render_faq_block(). The HowTo builder gives each step a
+     * `url` of permalink#krok-{position} using the step's ORIGINAL array index,
+     * so the rendered steps carry matching id="krok-{index+1}" anchors.
+     */
+    private function render_howto_block( array $attrs ): string {
+        $steps = $attrs['steps'] ?? [];
+        if ( ! is_array( $steps ) || empty( $steps ) ) {
+            return '';
+        }
+
+        $items = '';
+        foreach ( $steps as $i => $step ) {
+            if ( ! is_array( $step ) || empty( $step['name'] ) || empty( $step['text'] ) ) {
+                continue;
+            }
+            $items .= sprintf(
+                '<li id="krok-%1$d" class="ligase-howto__step"><h3 class="ligase-howto__step-name">%2$s</h3><div class="ligase-howto__step-text">%3$s</div></li>',
+                (int) $i + 1,
+                esc_html( $step['name'] ),
+                esc_html( $step['text'] )
+            );
+        }
+
+        if ( $items === '' ) {
+            return '';
+        }
+
+        $heading = '';
+        if ( ! empty( $attrs['name'] ) ) {
+            $heading = '<h2 class="ligase-howto__title">' . esc_html( $attrs['name'] ) . '</h2>';
+        }
+
+        return '<div class="ligase-howto wp-block-ligase-howto">' . $heading
+            . '<ol class="ligase-howto__steps">' . $items . '</ol></div>';
     }
 
     /**
