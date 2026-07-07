@@ -150,14 +150,13 @@
                 if (!rows.length) { $container.html('<p>Brak danych rich results w ostatnich 28 dniach.</p>'); return; }
 
                 var html = '<table class="wp-list-table widefat fixed striped" style="margin-top:12px;">';
-                html += '<thead><tr><th>Strona</th><th>Typ</th><th>Klikniecia</th><th>Wyswietlenia</th><th>CTR</th><th>Pozycja</th></tr></thead><tbody>';
+                html += '<thead><tr><th>Typ</th><th>Klikniecia</th><th>Wyswietlenia</th><th>CTR</th><th>Pozycja</th></tr></thead><tbody>';
 
                 rows.forEach(function(row) {
-                    var page = row.keys[0] || '';
-                    var appearance = row.keys[1] || '';
-                    var shortPage = page.replace(/^https?:\/\/[^\/]+/, '');
+                    // GSC only allows grouping by searchAppearance alone, so each
+                    // row is one appearance type (keys[0]), not a per-page entry.
+                    var appearance = (row.keys && row.keys[0]) || '';
                     html += '<tr>';
-                    html += '<td title="' + page + '">' + (shortPage.length > 50 ? shortPage.substr(0,50) + '...' : shortPage) + '</td>';
                     html += '<td><code>' + appearance + '</code></td>';
                     html += '<td>' + (row.clicks || 0) + '</td>';
                     html += '<td>' + (row.impressions || 0) + '</td>';
