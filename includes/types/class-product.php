@@ -77,6 +77,36 @@ class Ligase_Type_Product {
                 unset( $node['offers']['hasMerchantReturnPolicy'] );
             }
 
+            // Drop an incomplete shippingDetails skeleton. The contract's unitCode
+            // fields come from derive:unit_code_day, which always resolves to "DAY" —
+            // so with no store shipping configured every Offer still emitted a
+            // shippingDetails carrying only @types and unitCodes, with no rate and no
+            // destination country (which Google requires). Keep it only when it has a
+            // real rate or destination country, and strip deliveryTime QuantitativeValues
+            // left with just a unitCode (no min/max), which are invalid on their own.
+            if ( isset( $node['offers']['shippingDetails'] ) && is_array( $node['offers']['shippingDetails'] ) ) {
+                $sd          = $node['offers']['shippingDetails'];
+                $has_rate    = isset( $sd['shippingRate']['value'] ) && $sd['shippingRate']['value'] !== '';
+                $has_country = ! empty( $sd['shippingDestination']['addressCountry'] );
+
+                if ( ! $has_rate && ! $has_country ) {
+                    unset( $node['offers']['shippingDetails'] );
+                } else {
+                    foreach ( array( 'handlingTime', 'transitTime' ) as $qt ) {
+                        if ( isset( $sd['deliveryTime'][ $qt ] )
+                             && ! isset( $sd['deliveryTime'][ $qt ]['minValue'] )
+                             && ! isset( $sd['deliveryTime'][ $qt ]['maxValue'] ) ) {
+                            unset( $node['offers']['shippingDetails']['deliveryTime'][ $qt ] );
+                        }
+                    }
+                    // deliveryTime reduced to nothing but its @type → drop it.
+                    $dt = $node['offers']['shippingDetails']['deliveryTime'] ?? array();
+                    if ( is_array( $dt ) && empty( array_diff_key( $dt, array( '@type' => true ) ) ) ) {
+                        unset( $node['offers']['shippingDetails']['deliveryTime'] );
+                    }
+                }
+            }
+
             // Legacy variant path — if manual product data declares variants, use the
             // ProductGroup builder (resolver doesn't model variants today).
             if ( ! empty( $data['variants'] ) && is_array( $data['variants'] ) ) {
@@ -359,7 +389,7 @@ class Ligase_Type_Product {
             if ( ! empty( $opts['store_shipping_country'] ) ) {
                 $store_country  = strtoupper( wp_strip_all_tags( (string) $opts['store_shipping_country'] ) );
                 $store_currency = wp_strip_all_tags( (string) ( $opts['store_currency'] ?? 'PLN' ) );
-                $store_rate     = (string) (float) ( $opts['store_shipping_rate'] ?? 0 );
+                $store_rate     = Ligase_Price::to_string( $opts['store_shipping_rate'] ?? 0 );
                 $h_min = max( 0, (int) ( $opts['store_handling_min'] ?? 0 ) );
                 $h_max = max( $h_min, (int) ( $opts['store_handling_max'] ?? max( 1, $h_min ) ) );
                 $t_min = max( 0, (int) ( $opts['store_transit_min'] ?? 1 ) );
