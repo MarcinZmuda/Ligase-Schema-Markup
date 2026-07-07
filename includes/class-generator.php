@@ -62,7 +62,12 @@ class Ligase_Generator {
                 }
                 break;
             case 'front_page_posts':
-                $graph[] = $this->build_webpage( 'CollectionPage' );
+                // build_webpage() reads the global $post — which, on a latest-posts
+                // front page, is the newest post — so it emitted a CollectionPage whose
+                // url/@id/name/description all pointed at that post instead of the site
+                // home. build_collection_page() resolves the front page to the site name
+                // + home_url('/') (its else branch), which is what this node must be.
+                $graph[] = $this->build_collection_page();
                 break;
             case 'blog_listing':
                 $graph[] = $this->build_collection_page();
