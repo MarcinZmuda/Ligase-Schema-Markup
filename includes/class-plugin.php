@@ -258,19 +258,27 @@ class Ligase_Plugin {
 
             if ( $name === 'ligase/faq' && ! empty( $attrs['items'] ) && is_array( $attrs['items'] ) ) {
                 update_post_meta( $post_id, '_ligase_faq_items', $attrs['items'] );
+                update_post_meta( $post_id, '_ligase_faq_synced', 1 );
                 $found_faq = true;
             }
             if ( $name === 'ligase/howto' && ! empty( $attrs['steps'] ) && is_array( $attrs['steps'] ) ) {
                 update_post_meta( $post_id, '_ligase_howto', $attrs );
+                update_post_meta( $post_id, '_ligase_howto_synced', 1 );
                 $found_howto = true;
             }
         }
 
-        if ( ! $found_faq ) {
+        // Only clear meta that WE previously synced from a block. Without the
+        // provenance flag this handler wiped FAQ/HowTo meta set by any other
+        // source (REST publishers such as Brajn, importers) on every save of a
+        // post that happened not to contain the matching Gutenberg block.
+        if ( ! $found_faq && get_post_meta( $post_id, '_ligase_faq_synced', true ) ) {
             delete_post_meta( $post_id, '_ligase_faq_items' );
+            delete_post_meta( $post_id, '_ligase_faq_synced' );
         }
-        if ( ! $found_howto ) {
+        if ( ! $found_howto && get_post_meta( $post_id, '_ligase_howto_synced', true ) ) {
             delete_post_meta( $post_id, '_ligase_howto' );
+            delete_post_meta( $post_id, '_ligase_howto_synced' );
         }
     }
 
