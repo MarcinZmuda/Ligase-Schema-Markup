@@ -245,7 +245,14 @@ final class Ligase_Entity_Extractor_NER {
 		// In English it's rarely a locative preposition anyway.
 		$prepositions = 'w|we|na|z|ze|do|nad|pod|przy|in|at|from|near';
 
-		$pattern = '/(?<=\b(?:' . $prepositions . ')\s)((?:\p{Lu}\p{L}+)(?:\s+\p{Lu}\p{L}+){0,2})/u';
+		// The preposition is matched as a consuming prefix rather than a look-behind:
+		// a variable-length look-behind ("w" vs "near") only compiles on PCRE2 >= 10.43
+		// (2024) and fails with an "Internal error" on the libpcre2 shipped by common
+		// hosts (Debian 12 = 10.42, Ubuntu 22.04 = 10.39), returning false from
+		// preg_match_all and crashing collect_matches(). Capture group 1 (the place)
+		// and its offset are identical to the look-behind version, so callers are
+		// unaffected.
+		$pattern = '/\b(?:' . $prepositions . ')\s+((?:\p{Lu}\p{L}+)(?:\s+\p{Lu}\p{L}+){0,2})/u';
 
 		preg_match_all( $pattern, $content, $matches, PREG_OFFSET_CAPTURE );
 
