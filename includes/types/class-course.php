@@ -52,12 +52,22 @@ class Ligase_Type_Course {
             $instance['courseMode'] = $mode;
         }
 
+        // startDate / endDate must be ISO-8601 (date or datetime). A free-text value
+        // like "wrzesień 2026" disqualifies the CourseInstance, so validate and skip
+        // the field when it does not match rather than emit an invalid date.
+        $iso_re = '/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+\-]\d{2}:\d{2}|Z)?)?$/';
         if ( ! empty( $data['start_date'] ) ) {
-            $instance['startDate'] = wp_strip_all_tags( $data['start_date'] );
+            $start_raw = wp_strip_all_tags( (string) $data['start_date'] );
+            if ( preg_match( $iso_re, $start_raw ) ) {
+                $instance['startDate'] = $start_raw;
+            }
         }
 
         if ( ! empty( $data['end_date'] ) ) {
-            $instance['endDate'] = wp_strip_all_tags( $data['end_date'] );
+            $end_raw = wp_strip_all_tags( (string) $data['end_date'] );
+            if ( preg_match( $iso_re, $end_raw ) ) {
+                $instance['endDate'] = $end_raw;
+            }
         }
 
         if ( ! empty( $instance ) ) {
