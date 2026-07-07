@@ -26,6 +26,7 @@ class Ligase_Plugin {
             'includes/class-cache-bypass.php',
             'includes/class-score.php',
             'includes/class-price.php',
+            'includes/class-crypto.php',
             // Contract-driven field system — must load before type-classes and generator
             // so types can opt into resolver-based building (and readiness can introspect).
             'includes/class-field-contract.php',

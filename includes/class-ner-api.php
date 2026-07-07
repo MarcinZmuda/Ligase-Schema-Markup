@@ -42,7 +42,10 @@ class Ligase_NER_API {
 	public function __construct() {
 		$opts           = (array) get_option( 'ligase_options', array() );
 		$this->provider = $opts['ner_provider'] ?? '';
-		$this->api_key  = $opts['ner_api_key']  ?? '';
+		// Stored encrypted at rest (Ligase_Crypto). maybe_decrypt() passes through
+		// keys saved as plaintext before encryption was added, so upgrades keep working.
+		$stored         = (string) ( $opts['ner_api_key'] ?? '' );
+		$this->api_key  = class_exists( 'Ligase_Crypto' ) ? Ligase_Crypto::maybe_decrypt( $stored ) : $stored;
 	}
 
 	// =========================================================================

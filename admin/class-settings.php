@@ -534,6 +534,27 @@ class Ligase_Settings {
 		$placeholder = self::field_placeholder( $id );
 		$description = self::field_description( $id );
 
+		// Secrets (password fields, e.g. the NER API key) are stored encrypted and
+		// must never be echoed back into the HTML — not even the ciphertext. Render
+		// the field blank; a saved value shows a masked hint. An empty submit is
+		// treated as "unchanged" by the sanitizer.
+		if ( $type === 'password' ) {
+			$hint = ( $value !== '' )
+				? __( '•••••••• zapisany — wpisz nowy, aby zmienić', 'ligase' )
+				: (string) $placeholder;
+			printf(
+				'<input type="password" id="%1$s" name="%2$s[%3$s]" value="" class="regular-text" autocomplete="new-password" %4$s />',
+				esc_attr( 'ligase_field_' . $id ),
+				esc_attr( self::KEY ),
+				esc_attr( $id ),
+				$hint !== '' ? 'placeholder="' . esc_attr( $hint ) . '"' : ''
+			);
+			if ( $description ) {
+				echo '<p class="description">' . esc_html( $description ) . '</p>';
+			}
+			return;
+		}
+
 		printf(
 			'<input type="%1$s" id="%2$s" name="%3$s[%4$s]" value="%5$s" class="regular-text" %6$s />',
 			esc_attr( $type ),
@@ -620,9 +641,15 @@ class Ligase_Settings {
 			$clean['org_email'] = sanitize_email( wp_unslash( $input['org_email'] ) );
 		}
 
-		// NER API key (preserve)
+		// NER API key — encrypt at rest. The field renders blank (see render_field),
+		// so an empty submit means "unchanged": leave the encrypted value already
+		// present in $clean from the merge above. Only a freshly typed plaintext key
+		// is (re-)encrypted.
 		if ( isset( $input['ner_api_key'] ) ) {
-			$clean['ner_api_key'] = sanitize_text_field( wp_unslash( $input['ner_api_key'] ) );
+			$submitted = sanitize_text_field( wp_unslash( $input['ner_api_key'] ) );
+			if ( $submitted !== '' && class_exists( 'Ligase_Crypto' ) && ! Ligase_Crypto::is_encrypted( $submitted ) ) {
+				$clean['ner_api_key'] = Ligase_Crypto::encrypt( $submitted );
+			}
 		}
 
 		// URLs
