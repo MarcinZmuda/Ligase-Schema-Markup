@@ -206,6 +206,23 @@ final class Ligase_Logger {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 			file_put_contents( $index, '<?php // Silence is golden.' );
 		}
+
+		// One-time migration: rename legacy rotations (ligase-debug.log.php.N, which
+		// ended in .N and were served as static/downloadable on Nginx) to the new
+		// .N.php scheme so the exit-prefix protects them too.
+		for ( $i = 1; $i <= self::MAX_ROTATIONS; $i++ ) {
+			$legacy = $this->log_file . '.' . $i;
+			if ( ! file_exists( $legacy ) ) {
+				continue;
+			}
+			$target = $this->rotated_path( $i );
+			if ( file_exists( $target ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
+				unlink( $legacy );
+			} else {
+				rename( $legacy, $target );
+			}
+		}
 	}
 
 	/**
@@ -229,7 +246,7 @@ final class Ligase_Logger {
 		}
 
 		// Remove the oldest rotation if it exists.
-		$oldest = $this->log_file . '.' . self::MAX_ROTATIONS;
+		$oldest = $this->rotated_path( self::MAX_ROTATIONS );
 		if ( file_exists( $oldest ) ) {
 			// phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
 			unlink( $oldest );
@@ -237,8 +254,8 @@ final class Ligase_Logger {
 
 		// Shift existing rotations up by one.
 		for ( $i = self::MAX_ROTATIONS - 1; $i >= 1; $i-- ) {
-			$source      = $this->log_file . '.' . $i;
-			$destination = $this->log_file . '.' . ( $i + 1 );
+			$source      = $this->rotated_path( $i );
+			$destination = $this->rotated_path( $i + 1 );
 
 			if ( file_exists( $source ) ) {
 				rename( $source, $destination );
@@ -246,6 +263,19 @@ final class Ligase_Logger {
 		}
 
 		// Rotate the current log file.
-		rename( $this->log_file, $this->log_file . '.1' );
+		rename( $this->log_file, $this->rotated_path( 1 ) );
+	}
+
+	/**
+	 * Build the path for rotation number $i, keeping ".php" as the LAST extension.
+	 *
+	 * The old scheme appended the number after ".php" (ligase-debug.log.php.1),
+	 * so the rotated files ended in ".1" and Nginx — which ignores the directory
+	 * .htaccess — served them as downloadable static files, leaking every logged
+	 * line. Naming them ligase-debug.log.1.php keeps the ".php" extension last, so
+	 * the server routes them to PHP-FPM where the "<?php exit;" prefix denies them.
+	 */
+	private function rotated_path( int $i ): string {
+		return preg_replace( '/\.php$/', '.' . $i . '.php', $this->log_file );
 	}
 }
