@@ -70,6 +70,14 @@ class Ligase_Type_Course {
             }
         }
 
+        // Evergreen fallback: with no explicit start date, use the post's
+        // last-modified date so hasCourseInstance always carries a (fresh)
+        // startDate. Google needs a date/schedule on the CourseInstance for the
+        // course to be eligible, and editorial course pages rarely have fixed dates.
+        if ( empty( $instance['startDate'] ) ) {
+            $instance['startDate'] = get_the_modified_date( 'c', $post_id );
+        }
+
         if ( ! empty( $instance ) ) {
             $instance['@type'] = 'CourseInstance';
             $schema['hasCourseInstance'] = $instance;

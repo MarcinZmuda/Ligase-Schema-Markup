@@ -104,9 +104,43 @@ class Ligase_Generator {
             }
         }
 
-        $graph = apply_filters( 'ligase_schema_graph', $graph );
+        return $this->finalize_graph( $graph );
+    }
 
-        return array_values( array_filter( $graph ) );
+    /**
+     * Shared graph post-processing: materialize the founder Person, run the
+     * filter, drop empties, and de-duplicate by @id.
+     *
+     * Organization keeps a single `founder` @id reference (the employee[] list of
+     * every WP account was removed — those Person nodes were never materialized,
+     * so it emitted only dangling @ids and Google ignores the property anyway).
+     * Here we materialize the founder so that one reference actually resolves.
+     * The de-dupe guards against the founder also being the current post's author,
+     * which would otherwise place two Person nodes with the same @id in the graph.
+     */
+    private function finalize_graph( array $graph ): array {
+        $opts = (array) get_option( 'ligase_options', array() );
+        if ( ! empty( $opts['org_founder_id'] ) ) {
+            $graph[] = ( new Ligase_Type_Person( absint( $opts['org_founder_id'] ) ) )->build();
+        }
+
+        $graph = apply_filters( 'ligase_schema_graph', $graph );
+        $graph = array_values( array_filter( $graph ) );
+
+        $seen = array();
+        $out  = array();
+        foreach ( $graph as $node ) {
+            $id = ( is_array( $node ) && isset( $node['@id'] ) ) ? $node['@id'] : null;
+            if ( $id !== null ) {
+                if ( isset( $seen[ $id ] ) ) {
+                    continue;
+                }
+                $seen[ $id ] = true;
+            }
+            $out[] = $node;
+        }
+
+        return $out;
     }
 
     /**
@@ -335,9 +369,7 @@ class Ligase_Generator {
             wp_reset_postdata();
         }
 
-        $graph = apply_filters( 'ligase_schema_graph', $graph );
-
-        return array_values( array_filter( $graph ) );
+        return $this->finalize_graph( $graph );
     }
 
     /**

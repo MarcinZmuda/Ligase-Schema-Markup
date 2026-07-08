@@ -7,6 +7,14 @@ Wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 Pełne, szczegółowe release notes — w pliku [`readme.txt`](readme.txt) (WordPress format).
 
+## [2.4.28] - 2026-07-08
+
+### Dodane
+- **UI dla Course** — sekcja "Course — szkolenie / kurs" w meta-boxie (name, description, courseMode Online/Onsite/Blended, teaches), analogicznie do Service. `hasCourseInstance.startDate` = data modyfikacji strony (evergreen). Wcześniej Course miał toggle, ale brak pól do wpisania danych.
+
+### Naprawione
+- **Organization.employee[] — wiszące referencje**: property listowała do 20 kont WP jako `@id #author-N`, które nie były materializowane (a w trybie "Organizacja jako autor" nigdy) → wiszące referencje na prawie każdej stronie. Usunięta (nie daje rich resultu w Google). `founder` zostaje i jest teraz materializowany (referencja się rozwiązuje). Graf deduplikowany po `@id`.
+
 ## [2.4.27] - 2026-07-08
 
 ### Zmienione

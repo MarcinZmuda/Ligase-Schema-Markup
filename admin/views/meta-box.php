@@ -501,6 +501,47 @@ Zbierz dokumenty | Akty stanu cywilnego, dokumenty dochodowe."><?php echo esc_te
 
 		<?php
 		// =====================================================================
+		// COURSE — szkolenia / kursy / programy edukacyjne. Widoczne po włączeniu
+		// toggle Course. hasCourseInstance.startDate = data modyfikacji posta
+		// (evergreen), więc nie ma tu ręcznego pola daty.
+		// =====================================================================
+		$show_course_section = get_post_meta( $post->ID, '_ligase_enable_course', true ) === '1';
+		$course_meta = (array) ( get_post_meta( $post->ID, '_ligase_course', true ) ?: array() );
+		if ( $show_course_section ) :
+			$course_mode = (string) ( $course_meta['mode'] ?? 'Online' );
+			?>
+			<fieldset style="margin: 8px 0;">
+				<legend style="font-weight: 600; font-size: 12px; color: #444;">
+					<?php esc_html_e( 'Course — szkolenie / kurs', 'ligase' ); ?>
+				</legend>
+				<p style="font-size:11px; color:#646970; margin:4px 0;">
+					<?php esc_html_e( 'Wymaga włączenia "Course" w sekcji "Dodatkowe znaczniki" wyżej. hasCourseInstance z datą aktualizacji strony (evergreen).', 'ligase' ); ?>
+				</p>
+				<label style="display:block; margin:6px 0;">
+					<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'Nazwa kursu (Course.name)', 'ligase' ); ?></span>
+					<input type="text" name="ligase_course[name]" value="<?php echo esc_attr( (string) ( $course_meta['name'] ?? '' ) ); ?>" placeholder="<?php esc_attr_e( 'np. Szkolenie z ochrony danych osobowych', 'ligase' ); ?>" style="width:100%;" />
+				</label>
+				<label style="display:block; margin:6px 0;">
+					<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'Opis (auto z excerpt gdy puste)', 'ligase' ); ?></span>
+					<textarea name="ligase_course[description]" rows="3" style="width:100%;" placeholder="<?php esc_attr_e( 'Krótki opis kursu, max 300 znaków', 'ligase' ); ?>"><?php echo esc_textarea( (string) ( $course_meta['description'] ?? '' ) ); ?></textarea>
+				</label>
+				<label style="display:block; margin:6px 0;">
+					<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'Tryb (courseMode)', 'ligase' ); ?></span>
+					<select name="ligase_course[mode]" style="width:100%;">
+						<?php foreach ( array( 'Online', 'Onsite', 'Blended' ) as $mode_opt ) : ?>
+							<option value="<?php echo esc_attr( $mode_opt ); ?>" <?php selected( $course_mode, $mode_opt ); ?>><?php echo esc_html( $mode_opt ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<label style="display:block; margin:6px 0;">
+					<span style="display:block; font-size:11px; color:#646970;"><?php esc_html_e( 'Czego uczy (teaches — po przecinku)', 'ligase' ); ?></span>
+					<input type="text" name="ligase_course[teaches]" value="<?php echo esc_attr( (string) ( $course_meta['teaches'] ?? '' ) ); ?>" placeholder="<?php esc_attr_e( 'np. RODO, ochrona danych, bezpieczeństwo informacji', 'ligase' ); ?>" style="width:100%;" />
+				</label>
+			</fieldset>
+		<?php endif; ?>
+
+		<?php
+		// =====================================================================
 		// RECIPE
 		// =====================================================================
 		$show_recipe_section = get_post_meta( $post->ID, '_ligase_enable_recipe', true ) === '1';

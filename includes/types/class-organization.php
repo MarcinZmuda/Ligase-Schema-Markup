@@ -98,23 +98,13 @@ class Ligase_Type_Organization {
             $schema['founder'] = [ '@id' => home_url( '/#author-' . $founder_id ) ];
         }
 
-        // employee — published authors linked by @id.
-        // `has_published_posts` expects an array of post_types since WP 6.4 (was boolean
-        // in 4.7+ but deprecated). Plus cap at 20 entries — a 500-author employee[] is
-        // payload bloat that helps no one and is cached for 12h.
-        $authors = get_users( array(
-            'has_published_posts' => array( 'post' ),
-            'fields'              => 'ID',
-            'number'              => 20,
-            'orderby'             => 'post_count',
-            'order'               => 'DESC',
-        ) );
-        if ( ! empty( $authors ) ) {
-            $schema['employee'] = array_values( array_map(
-                fn( $uid ) => [ '@id' => home_url( '/#author-' . (int) $uid ) ],
-                $authors
-            ) );
-        }
+        // NOTE: no employee[] here. It previously listed every published WP author
+        // as { "@id": "#author-N" }, but those Person nodes are only materialized
+        // for the current post's author (and never in org_author_mode) — so it
+        // emitted dangling references on nearly every page. Organization.employee
+        // drives no Google rich result, so the property was dropped rather than
+        // bloating the graph with 20 Person stubs. The founder (single, real
+        // person) is kept and materialized in Ligase_Generator::finalize_graph().
 
         // Store-level merchant return policy — `hasMerchantReturnPolicy` IS a valid
         // property of OnlineStore (via the Organization → OnlineStore type chain), so
