@@ -5,7 +5,7 @@
  * Description:       Complete schema.org JSON-LD for WordPress blogs. BlogPosting, Person,
  *                    Organization, BreadcrumbList, FAQPage, HowTo, VideoObject, and more.
  *                    Schema Auditor replaces weak markup. Compliant with Google guidelines March 2026.
- * Version:           2.4.26
+ * Version:           2.4.27
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Marcin Żmuda
@@ -17,23 +17,26 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LIGASE_VERSION', '2.4.26' );
+define( 'LIGASE_VERSION', '2.4.27' );
 define( 'LIGASE_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'LIGASE_URL',     plugin_dir_url( __FILE__ ) );
 define( 'LIGASE_FILE',    __FILE__ );
 
 /**
- * Self-hosted update checker → GitHub Releases.
+ * Update checker → GitHub Releases.
  *
  * Gives Ligase the standard WordPress "Update now" button + "View details"
  * changelog whenever a newer release is published on GitHub, exactly like a
- * wordpress.org plugin. The repository is private, so downloads must be
- * authenticated: define a fine-grained, read-only ("Contents: read") Personal
- * Access Token scoped to ONLY this repo in wp-config.php —
+ * wordpress.org plugin. The repository is public, so this works out of the box
+ * with no token and no configuration.
+ *
+ * A token is OPTIONAL and only raises GitHub's API rate limit (60 → 5000
+ * requests/hour), which matters only if many sites check from the same IP. To
+ * use one, define a fine-grained, read-only ("Contents: read") token in
+ * wp-config.php —
  *
  *     define( 'LIGASE_GH_TOKEN', 'github_pat_xxx' );
  *
- * Without the constant the plugin still works; it just won't see updates.
  * Loaded only in admin / cron, where update checks actually run, so there is no
  * front-end overhead.
  */
