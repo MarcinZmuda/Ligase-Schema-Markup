@@ -707,7 +707,12 @@ class Ligase_Ajax {
 					$sanitized_options[ $key ] = sanitize_text_field( $value );
 				}
 			}
-			update_option( 'ligase_options', $sanitized_options );
+			// Merge onto the existing options instead of replacing them: the
+			// import whitelist deliberately omits secrets such as ner_api_key,
+			// so a wholesale update_option() wiped the stored NER API key (and any
+			// other non-exported key) on every settings import.
+			$existing_options = (array) get_option( 'ligase_options', array() );
+			update_option( 'ligase_options', array_merge( $existing_options, $sanitized_options ) );
 
 			// Import author meta.
 			if ( ! empty( $data['author_meta'] ) && is_array( $data['author_meta'] ) ) {
@@ -788,60 +793,21 @@ class Ligase_Ajax {
 
 				foreach ( $repairs as $repair ) {
 					try {
-						$schema_json = get_post_meta( $post_id, '_ligase_schema', true );
-
-						if ( empty( $schema_json ) ) {
+						// Ligase generates JSON-LD live at wp_head (cached in a transient), so
+						// there is no stored schema blob to rewrite. The old code read a
+						// `_ligase_schema` meta that nothing ever writes, so every repair
+						// silently did nothing. Operate on the real per-post override instead.
+						//
+						// fix_dates / truncate_headlines need no work: the builder already
+						// emits ISO-8601 dates (get_the_date('c')) and truncates headlines to
+						// <=110 chars at generation time.
+						if ( $repair !== 'convert_article_to_blogposting' ) {
 							continue;
 						}
 
-						$schema  = json_decode( $schema_json, true );
-						$changed = false;
-
-						switch ( $repair ) {
-							case 'fix_dates':
-								if ( ! empty( $schema['datePublished'] ) ) {
-									$timestamp = strtotime( $schema['datePublished'] );
-									if ( $timestamp ) {
-										$iso_date = gmdate( 'Y-m-d\TH:i:sP', $timestamp );
-										if ( $schema['datePublished'] !== $iso_date ) {
-											$schema['datePublished'] = $iso_date;
-											$changed                 = true;
-										}
-									}
-								}
-								if ( ! empty( $schema['dateModified'] ) ) {
-									$timestamp = strtotime( $schema['dateModified'] );
-									if ( $timestamp ) {
-										$iso_date = gmdate( 'Y-m-d\TH:i:sP', $timestamp );
-										if ( $schema['dateModified'] !== $iso_date ) {
-											$schema['dateModified'] = $iso_date;
-											$changed                = true;
-										}
-									}
-								}
-								break;
-
-							case 'truncate_headlines':
-								if ( ! empty( $schema['headline'] ) && mb_strlen( $schema['headline'] ) > 110 ) {
-									$schema['headline'] = mb_substr( $schema['headline'], 0, 110 );
-									$changed            = true;
-								}
-								break;
-
-							case 'convert_article_to_blogposting':
-								if ( ! empty( $schema['@type'] ) && 'Article' === $schema['@type'] ) {
-									$schema['@type'] = 'BlogPosting';
-									$changed         = true;
-								}
-								break;
-						}
-
-						if ( $changed ) {
-							update_post_meta(
-								$post_id,
-								'_ligase_schema',
-								wp_json_encode( $schema, JSON_UNESCAPED_UNICODE )
-							);
+						if ( get_post_meta( $post_id, '_ligase_schema_type', true ) === 'Article' ) {
+							update_post_meta( $post_id, '_ligase_schema_type', 'BlogPosting' );
+							Ligase_Cache::invalidate_post_and_related( $post_id );
 							++$fixed;
 						}
 					} catch ( \Exception $e ) {
@@ -1220,9 +1186,18 @@ class Ligase_Ajax {
 			return;
 		}
 
-		// Sanitize
+		// Sanitize. Note: the UI sends id="" (empty string, not null) for new
+		// rules, so `?? generate_id()` never fired — every new rule was saved with
+		// an empty id and the update/append loop below then overwrote the single
+		// id="" entry, making it impossible to store more than one rule (or delete
+		// one by id). Fall back to a generated id whenever it sanitizes to empty.
+		$rule_id = sanitize_key( $rule_data['id'] ?? '' );
+		if ( '' === $rule_id ) {
+			$rule_id = Ligase_Schema_Rules::generate_id();
+		}
+
 		$rule = array(
-			'id'              => sanitize_key( $rule_data['id'] ?? Ligase_Schema_Rules::generate_id() ),
+			'id'              => $rule_id,
 			'name'            => sanitize_text_field( $rule_data['name'] ?? '' ),
 			'condition_type'  => sanitize_key( $rule_data['condition_type'] ?? 'category' ),
 			'condition_value' => sanitize_text_field( $rule_data['condition_value'] ?? '' ),

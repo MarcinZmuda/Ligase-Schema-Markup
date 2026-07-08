@@ -81,12 +81,19 @@ class Ligase_Type_VideoObject {
             return array();
         }
 
+        // uploadDate is required and must be ISO-8601. Use the manual value only when
+        // it validates; otherwise fall back to the post date (get_the_date('c') is
+        // always ISO), so a free-text override can never emit an invalid uploadDate.
+        $iso_re      = '/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2})?([+\-]\d{2}:\d{2}|Z)?)?$/';
+        $upload_raw  = wp_strip_all_tags( (string) ( $meta['upload_date'] ?? '' ) );
+        $upload_date = preg_match( $iso_re, $upload_raw ) ? $upload_raw : get_the_date( 'c', $post_id );
+
         $schema = array(
             '@type'        => 'VideoObject',
             '@id'          => esc_url( get_permalink( $post_id ) ) . '#video',
             'name'         => $name,
             'thumbnailUrl' => esc_url( $thumbnail ),
-            'uploadDate'   => wp_strip_all_tags( (string) ( $meta['upload_date'] ?? get_the_date( 'c', $post_id ) ) ),
+            'uploadDate'   => $upload_date,
         );
         if ( $embed !== '' )   { $schema['embedUrl']   = esc_url( $embed ); }
         if ( $content !== '' ) { $schema['contentUrl'] = esc_url( $content ); }

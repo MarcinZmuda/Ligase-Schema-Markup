@@ -62,6 +62,23 @@ class Ligase_Type_Recipe {
             }
         }
 
+        // prepTime / cookTime / totalTime must be ISO-8601 durations (e.g. "PT30M").
+        // Neither the contract (sanitize=text) nor the metabox validates them, so a
+        // human value like "30 minut" flowed straight into the schema and Search
+        // Console flagged the Recipe. Normalise here regardless of source; drop the
+        // field when it cannot be turned into a valid duration.
+        foreach ( array( 'prepTime', 'cookTime', 'totalTime' ) as $time_key ) {
+            if ( ! isset( $node[ $time_key ] ) ) {
+                continue;
+            }
+            $iso = $this->normalize_duration( $node[ $time_key ] );
+            if ( $iso === null ) {
+                unset( $node[ $time_key ] );
+            } else {
+                $node[ $time_key ] = $iso;
+            }
+        }
+
         // Recipe needs name + image. Without those there's no useful rich result;
         // skip the node rather than emit half a Recipe that Search Console flags.
         if ( empty( $node['name'] ) || empty( $node['image'] ) ) {
@@ -93,5 +110,60 @@ class Ligase_Type_Recipe {
         $node['@id'] = esc_url( get_permalink( $post_id ) ) . '#recipe';
 
         return apply_filters( 'ligase_recipe', $node, $post_id );
+    }
+
+    /**
+     * Coerce a duration value to an ISO-8601 duration string (e.g. "PT1H30M").
+     *
+     * Accepts an already-valid ISO-8601 duration, a bare integer (minutes), or
+     * common Polish / English free text ("1 godz 30 min", "90 minut", "2 hours").
+     * Returns null when nothing usable can be parsed.
+     *
+     * @param mixed $value Raw duration value.
+     * @return string|null
+     */
+    private function normalize_duration( $value ): ?string {
+        $value = trim( (string) $value );
+        if ( $value === '' ) {
+            return null;
+        }
+
+        // Already a valid ISO-8601 duration (reject the empty "P" / "PT" shells).
+        if ( $value !== 'P' && $value !== 'PT'
+            && preg_match( '/^P(?:\d+[YMWD])*(?:T(?:\d+[HMS])*)?$/', $value ) ) {
+            return $value;
+        }
+
+        $hours   = 0;
+        $minutes = 0;
+        $matched = false;
+
+        if ( preg_match( '/(\d+)\s*(?:h\b|godz|godzin[ay]?|hours?|hrs?)/iu', $value, $m ) ) {
+            $hours   = (int) $m[1];
+            $matched = true;
+        }
+        if ( preg_match( '/(\d+)\s*(?:min|minut[ayę]?|minutes?|m\b)/iu', $value, $m ) ) {
+            $minutes = (int) $m[1];
+            $matched = true;
+        }
+        // Bare number → minutes.
+        if ( ! $matched && preg_match( '/^\d+$/', $value ) ) {
+            $minutes = (int) $value;
+            $matched = true;
+        }
+
+        if ( ! $matched || ( $hours === 0 && $minutes === 0 ) ) {
+            return null;
+        }
+
+        $out = 'PT';
+        if ( $hours > 0 ) {
+            $out .= $hours . 'H';
+        }
+        if ( $minutes > 0 ) {
+            $out .= $minutes . 'M';
+        }
+
+        return $out;
     }
 }

@@ -230,16 +230,14 @@ class Ligase_GSC {
      * @return array|WP_Error
      */
     public static function get_rich_results_data() {
+        // The Search Console API rejects (HTTP 400) any request that groups
+        // searchAppearance together with another dimension, and it also forbids
+        // filtering by searchAppearance. The previous query did both, so this
+        // report never returned data. searchAppearance can only be queried on its
+        // own — which yields the rich-result breakdown per appearance type.
         return self::search_analytics( [
-            'dimensions'       => [ 'page', 'searchAppearance' ],
-            'rowLimit'         => 500,
-            'dimensionFilterGroups' => [ [
-                'filters' => [ [
-                    'dimension'  => 'searchAppearance',
-                    'operator'   => 'notEquals',
-                    'expression' => 'WEB_LIGHT_RESULTS',
-                ] ],
-            ] ],
+            'dimensions' => [ 'searchAppearance' ],
+            'rowLimit'   => 500,
         ] );
     }
 
