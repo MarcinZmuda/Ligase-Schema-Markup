@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.27
+Stable tag: 2.4.28
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,15 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.28 =
+**UI dla Course (szkolenia/kursy) + czystszy węzeł Organization (koniec wiszących `employee`).**
+
+Course — meta-box:
+Dodano sekcję "Course — szkolenie / kurs" w meta-boxie wpisu (widoczna po włączeniu toggle Course), analogicznie do Service: pola name, description, courseMode (Online/Onsite/Blended), teaches. Wcześniej Course miał tylko przełącznik, ale nie było UI do wpisania danych. `hasCourseInstance.startDate` bierze automatycznie **datę modyfikacji strony** (evergreen — programy szkoleń rzadko mają sztywną datę, a Google wymaga daty/harmonogramu na CourseInstance).
+
+Organization — usunięto `employee[]`:
+Węzeł Organization emitował `employee[]` z listą do 20 kont WP jako `{ "@id": "#author-N" }`, ale te węzły Person materializowały się tylko dla autora bieżącego wpisu (i wcale w trybie "Organizacja jako autor") — więc na niemal każdej stronie były to **wiszące referencje** do nieistniejących węzłów. `Organization.employee` nie daje żadnego rich resultu w Google, więc property została usunięta zamiast rozdymać graf 20 pustymi węzłami Person. `founder` (pojedynczy, realny człowiek) zostaje i jest teraz **materializowany** — jego referencja realnie się rozwiązuje. Dodatkowo graf jest deduplikowany po `@id` (founder = autor nie tworzy już duplikatu).
 
 = 2.4.27 =
 **Doprecyzowanie: token GitHub jest OPCJONALNY.**

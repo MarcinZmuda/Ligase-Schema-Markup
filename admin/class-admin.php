@@ -485,6 +485,17 @@ class Ligase_Admin {
 					'availability'   => 'text',
 				),
 			),
+			'ligase_course'     => array(
+				'meta_key' => '_ligase_course',
+				'fields'   => array(
+					'name'        => 'text',
+					'description' => 'textarea',
+					'mode'        => 'text', // courseMode; validated against whitelist in the type
+					'teaches'     => 'text', // comma-separated; split in the type
+					'start_date'  => 'text', // optional ISO override; else post modified date
+					'end_date'    => 'text',
+				),
+			),
 			'ligase_recipe'     => array(
 				'meta_key' => '_ligase_recipe',
 				'fields'   => array(
