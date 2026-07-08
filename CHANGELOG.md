@@ -7,10 +7,15 @@ Wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 Pełne, szczegółowe release notes — w pliku [`readme.txt`](readme.txt) (WordPress format).
 
+## [2.4.27] - 2026-07-08
+
+### Zmienione
+- Doprecyzowano, że token GitHub jest **opcjonalny**: repo jest publiczne, więc auto-update z 2.4.26 działa bez tokena i bez konfiguracji. `LIGASE_GH_TOKEN` służy już tylko do podniesienia limitu API GitHuba (60 → 5000/h). Poprawiony mylący komentarz w kodzie i opis w readme. Bez zmian funkcjonalnych.
+
 ## [2.4.26] - 2026-07-08
 
 ### Dodane
-- **Automatyczne aktualizacje z GitHub Releases** — wbudowany Plugin Update Checker (YahnisElsts v5.7) pokazuje standardowy przycisk "Zaktualizuj teraz" + "Wyświetl szczegóły", jak wtyczka z wordpress.org. Prywatne repo → token `LIGASE_GH_TOKEN` (fine-grained PAT, `Contents: read`) w `wp-config.php`. Checker ładowany tylko w admin/cron; instaluje ZIP z release'u.
+- **Automatyczne aktualizacje z GitHub Releases** — wbudowany Plugin Update Checker (YahnisElsts v5.7) pokazuje standardowy przycisk "Zaktualizuj teraz" + "Wyświetl szczegóły", jak wtyczka z wordpress.org. Repo publiczne → działa bez konfiguracji; opcjonalny token `LIGASE_GH_TOKEN` tylko na limit API. Checker ładowany tylko w admin/cron; instaluje ZIP z release'u.
 
 ## [2.4.25] - 2026-07-08
 
