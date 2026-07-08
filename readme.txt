@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.24
+Stable tag: 2.4.25
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,34 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.25 =
+**Duży audyt korektowy (17 poprawek) + AggregateOffer dla produktów wariantowych WooCommerce.**
+
+Bezpieczeństwo:
+* Klucz API NER szyfrowany w bazie (AES-256-CBC na `wp_salt('auth')`, jak GSC) zamiast plaintext. Nowa klasa `Ligase_Crypto`; istniejące klucze plaintext działają dalej (migracja przez prefiks), pole hasła nie zwraca sekretu do HTML.
+* Rotowane logi (`ligase-debug.log.N.php` zamiast `.log.php.N`) — końcówka `.php` trafia do PHP-FPM i ginie na prefiksie `exit;`, więc Nginx (ignoruje `.htaccess`) nie serwuje ich jako pobieralne pliki. Stare pliki migrowane automatycznie.
+
+Krytyczne / martwe funkcje:
+* **NER fatal na typowym hostingu**: lookbehind zmiennej długości w wykrywaniu miejsc kompilował się dopiero na PCRE2 ≥ 10.43 (Debian 12 = 10.42) → `preg_match_all` zwracał `false` i rzucał `TypeError` przy każdej analizie encji.
+* **Audytor ślepy na Yoast/Rank Math**: regex wymagał `type=` jako jedynego atrybutu, więc `class="yoast-schema-graph"` / `rank-math-schema` czyniły audyt no-opem.
+* **Silnik reguł**: nowa reguła zapisywała się z pustym `id` i nadpisywała poprzednią — dało się mieć tylko jedną regułę.
+* **sync_block_meta** kasował FAQ/HowTo ustawione przez REST (Brajn) / import przy każdym zapisie bez bloków Gutenberga (provenance-flag).
+* **Import ustawień** kasował klucz API NER zamiast go zachować (merge zamiast overwrite).
+* **Dashboard GSC**: zapytanie rich-results zawsze zwracało HTTP 400 (grupowanie i filtr po `searchAppearance` naraz — API tego zabrania).
+* **Strona Narzędzia**: re-rejestracja submenu (eksport/import/walidator/auto-naprawa/health-report/cache były nieosiągalne od 2.4.3).
+* **Auto-naprawa** operowała na nieistniejącym meta `_ligase_schema` — przepięta na realny `_ligase_schema_type` + inwalidacja cache.
+
+Schema na froncie:
+* Ceny z przecinkiem dziesiętnym (`24,99` → `24.99`) w ofertach Product/Service (nowy helper `Ligase_Price`).
+* CollectionPage na stronie głównej z listą wpisów wskazywał URL najnowszego wpisu zamiast strony głównej.
+* Bloki FAQ/HowTo renderują teraz widoczną treść (wcześniej emitowały samą schemę bez treści — ryzyko manual action).
+* Szkieletowy `shippingDetails` (bez stawki i kraju) usuwany z ofert WooCommerce, gdy sklep nie ma skonfigurowanej wysyłki.
+* Recipe: `prepTime`/`cookTime`/`totalTime` normalizowane do ISO-8601 (`30 minut` → `PT30M`); nieparsowalne pomijane.
+* Course/VideoObject: walidacja dat do ISO-8601 (jak Event).
+
+WooCommerce:
+* **AggregateOffer** dla produktów wariantowych: pojedyncza cena z `get_price()` zastępowana `lowPrice`/`highPrice` z realnego zakresu wariantów (`get_variation_prices`), co eliminuje ostrzeżenie o niezgodności ceny w Merchant Listings. AggregateOffer dziedziczy wszystkie sygnały merchant-listing z pojedynczej oferty.
 
 = 2.4.24 =
 **Suppressor: dodano WooCommerce core JSON-LD (eliminuje "Zduplikowane pole brand" + "Nieprawidłowy typ obiektu w polu offers" w sklepach z wariantami).**

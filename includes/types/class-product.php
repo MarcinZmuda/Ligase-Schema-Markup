@@ -130,6 +130,17 @@ class Ligase_Type_Product {
                 $node['offers']['seller'] = array( '@id' => home_url( '/#org' ) );
             }
 
+            // WooCommerce variable products: the resolver fills a single price
+            // (WC get_price() — the default/min variation), which misrepresents a
+            // product that actually sells across a range. Google flags that as a
+            // price mismatch in Merchant Listings. When there's no manual variant
+            // contract, promote the single Offer to an AggregateOffer carrying the
+            // real low/high range read straight from WooCommerce.
+            if ( $is_wc_product && empty( $data['variants'] )
+                 && isset( $node['offers'] ) && is_array( $node['offers'] ) ) {
+                $node['offers'] = $this->maybe_aggregate_offer( $node['offers'], $post_id );
+            }
+
             return apply_filters( 'ligase_product', $node, $post_id );
         }
 
@@ -425,6 +436,72 @@ class Ligase_Type_Product {
         }
 
         return $offer;
+    }
+
+    /**
+     * Promote a single Offer to an AggregateOffer for WooCommerce variable
+     * products, using the real variation price range. Prevents the schema-vs-page
+     * price mismatch that Google's Merchant Listings guidelines flag when a
+     * variable product declares one fixed price instead of a range.
+     *
+     * AggregateOffer is a subtype of Offer, so it keeps all the merchant-listing
+     * signals already computed on the single Offer (availability, currency,
+     * seller, return policy, shipping); only the price representation changes.
+     *
+     * Returns the offer unchanged for non-variable products, missing WooCommerce,
+     * or when a usable price range can't be determined.
+     *
+     * @param array $offer   The single Offer built by the resolver.
+     * @param int   $post_id Product post ID.
+     * @return array         AggregateOffer, or the original Offer untouched.
+     */
+    private function maybe_aggregate_offer( array $offer, int $post_id ): array {
+        if ( ! function_exists( 'wc_get_product' ) ) {
+            return $offer;
+        }
+        $product = wc_get_product( $post_id );
+        if ( ! $product || ! $product->is_type( 'variable' ) ) {
+            return $offer;
+        }
+
+        // Display prices honour the store's tax display setting, so they match
+        // what the customer sees on the page (which is what Google compares).
+        $prices = $product->get_variation_prices( true );
+        if ( empty( $prices['price'] ) || ! is_array( $prices['price'] ) ) {
+            return $offer;
+        }
+        $values = array_map( 'floatval', array_values( $prices['price'] ) );
+        $values = array_filter( $values, fn( $v ) => $v > 0 );
+        if ( empty( $values ) ) {
+            return $offer;
+        }
+        $low  = min( $values );
+        $high = max( $values );
+
+        // If every variation shares one price there is no range → a plain Offer
+        // is already accurate, leave it alone.
+        if ( $low === $high ) {
+            return $offer;
+        }
+
+        $aggregate = array(
+            '@type'         => 'AggregateOffer',
+            'priceCurrency' => $offer['priceCurrency'] ?? 'PLN',
+            'lowPrice'      => (string) $low,
+            'highPrice'     => (string) $high,
+            'offerCount'    => count( $values ),
+        );
+
+        // Carry over every merchant-listing signal from the single Offer. `price`
+        // and `priceSpecification` are intentionally dropped — a range replaces the
+        // single value.
+        foreach ( array( 'availability', 'itemCondition', 'url', 'seller', 'hasMerchantReturnPolicy', 'shippingDetails' ) as $carry ) {
+            if ( isset( $offer[ $carry ] ) ) {
+                $aggregate[ $carry ] = $offer[ $carry ];
+            }
+        }
+
+        return $aggregate;
     }
 
     /**
