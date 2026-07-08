@@ -7,6 +7,11 @@ Wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 Pełne, szczegółowe release notes — w pliku [`readme.txt`](readme.txt) (WordPress format).
 
+## [2.4.26] - 2026-07-08
+
+### Dodane
+- **Automatyczne aktualizacje z GitHub Releases** — wbudowany Plugin Update Checker (YahnisElsts v5.7) pokazuje standardowy przycisk "Zaktualizuj teraz" + "Wyświetl szczegóły", jak wtyczka z wordpress.org. Prywatne repo → token `LIGASE_GH_TOKEN` (fine-grained PAT, `Contents: read`) w `wp-config.php`. Checker ładowany tylko w admin/cron; instaluje ZIP z release'u.
+
 ## [2.4.25] - 2026-07-08
 
 ### Bezpieczeństwo

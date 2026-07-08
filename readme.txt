@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.25
+Stable tag: 2.4.26
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,17 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.26 =
+**Automatyczne aktualizacje z GitHub Releases — przycisk "Zaktualizuj teraz" jak przy zwykłych wtyczkach.**
+
+Ligase sam sprawdza teraz najnowszy release na GitHubie i pokazuje standardowy przycisk aktualizacji WordPressa (+ "Wyświetl szczegóły" z changelogiem). Nie trzeba już ręcznie wgrywać ZIP-a przy każdej nowej wersji.
+
+Wbudowana biblioteka Plugin Update Checker (YahnisElsts, v5.7). Repozytorium jest prywatne, więc wymagany jest read-only token GitHub, wklejony JEDEN raz w `wp-config.php` danej strony:
+
+`define( 'LIGASE_GH_TOKEN', 'github_pat_...' );`
+
+Token: fine-grained PAT z uprawnieniem **Contents: read**, ograniczony wyłącznie do repo Ligase (minimalny zasięg, łatwa rotacja). Bez stałej wtyczka działa normalnie — po prostu nie widzi aktualizacji. Checker ładuje się tylko w panelu/cronie (zero narzutu na froncie) i instaluje ZIP z release'u (poprawna struktura katalogu `ligase/`).
 
 = 2.4.25 =
 **Duży audyt korektowy (17 poprawek) + AggregateOffer dla produktów wariantowych WooCommerce.**
