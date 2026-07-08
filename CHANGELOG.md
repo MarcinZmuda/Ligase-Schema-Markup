@@ -7,6 +7,29 @@ Wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 Pełne, szczegółowe release notes — w pliku [`readme.txt`](readme.txt) (WordPress format).
 
+## [2.4.25] - 2026-07-08
+
+### Bezpieczeństwo
+- Klucz API NER szyfrowany w bazie (`Ligase_Crypto`, AES-256-CBC / `wp_salt('auth')`) zamiast plaintext; migracja plaintext→encrypted przez prefiks, pole hasła nie zwraca sekretu do HTML.
+- Rotowane logi nazwane `…log.N.php` (nie `…log.php.N`) — Nginx nie serwuje ich już jako pobieralne pliki; stare pliki migrowane automatycznie.
+
+### Naprawione (krytyczne)
+- **NER fatal na PCRE2 < 10.43**: lookbehind zmiennej długości w `detect_places()` → `TypeError` przy każdej analizie encji na Debian 12 / Ubuntu 22.04.
+- **Audytor** nie wykrywał schemy Yoast/Rank Math (regex wymagał `type=` jako jedynego atrybutu).
+- **Reguły schematu**: nowa reguła nadpisywała poprzednią (pusty `id`).
+- **sync_block_meta** kasował FAQ/HowTo ustawione przez REST/import; **import ustawień** kasował klucz NER; **auto-naprawa** operowała na nieistniejącym `_ligase_schema`.
+- **Dashboard GSC** rich-results zawsze HTTP 400; **strona Narzędzia** — re-rejestracja osieroconego submenu.
+
+### Naprawione (schema na froncie)
+- Ceny z przecinkiem (`24,99`→`24.99`) w Product/Service (`Ligase_Price`).
+- CollectionPage na home wskazywał najnowszy wpis zamiast strony głównej.
+- Bloki FAQ/HowTo renderują widoczną treść (było: sama schema).
+- Szkieletowy `shippingDetails` usuwany, gdy brak konfiguracji wysyłki.
+- Recipe `prepTime`/`cookTime`/`totalTime` → ISO-8601; walidacja dat Course/VideoObject.
+
+### Dodane
+- **AggregateOffer** dla produktów wariantowych WooCommerce (`lowPrice`/`highPrice` z `get_variation_prices` zamiast pojedynczej `get_price()`), usuwa niezgodność ceny w Merchant Listings.
+
 ## [2.4.22] - 2026-06-07
 
 ### Dodane
