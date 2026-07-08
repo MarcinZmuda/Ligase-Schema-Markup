@@ -5,7 +5,7 @@
  * Description:       Complete schema.org JSON-LD for WordPress blogs. BlogPosting, Person,
  *                    Organization, BreadcrumbList, FAQPage, HowTo, VideoObject, and more.
  *                    Schema Auditor replaces weak markup. Compliant with Google guidelines March 2026.
- * Version:           2.4.25
+ * Version:           2.4.26
  * Requires at least: 6.0
  * Requires PHP:      8.0
  * Author:            Marcin Żmuda
@@ -17,10 +17,43 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'LIGASE_VERSION', '2.4.25' );
+define( 'LIGASE_VERSION', '2.4.26' );
 define( 'LIGASE_DIR',     plugin_dir_path( __FILE__ ) );
 define( 'LIGASE_URL',     plugin_dir_url( __FILE__ ) );
 define( 'LIGASE_FILE',    __FILE__ );
+
+/**
+ * Self-hosted update checker → GitHub Releases.
+ *
+ * Gives Ligase the standard WordPress "Update now" button + "View details"
+ * changelog whenever a newer release is published on GitHub, exactly like a
+ * wordpress.org plugin. The repository is private, so downloads must be
+ * authenticated: define a fine-grained, read-only ("Contents: read") Personal
+ * Access Token scoped to ONLY this repo in wp-config.php —
+ *
+ *     define( 'LIGASE_GH_TOKEN', 'github_pat_xxx' );
+ *
+ * Without the constant the plugin still works; it just won't see updates.
+ * Loaded only in admin / cron, where update checks actually run, so there is no
+ * front-end overhead.
+ */
+if ( is_admin() || ( defined( 'DOING_CRON' ) && DOING_CRON ) ) {
+    require_once LIGASE_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
+
+    $ligase_update_checker = YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+        'https://github.com/MarcinZmuda/Ligase-Schema-Markup/',
+        LIGASE_FILE,
+        'ligase'
+    );
+
+    // Install the ZIP asset attached to each release (correct `ligase/` folder
+    // structure); the GitHub source zipball would unpack to a repo-named folder.
+    $ligase_update_checker->getVcsApi()->enableReleaseAssets( '/ligase.*\.zip$/i' );
+
+    if ( defined( 'LIGASE_GH_TOKEN' ) && LIGASE_GH_TOKEN ) {
+        $ligase_update_checker->setAuthentication( LIGASE_GH_TOKEN );
+    }
+}
 
 require_once LIGASE_DIR . 'includes/class-plugin.php';
 
