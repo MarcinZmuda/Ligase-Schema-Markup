@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || exit;
 class Ligase_Type_Review {
 
     public function build(): ?array {
-        if ( ! is_single() ) {
+        if ( ! is_singular() ) {
             return null;
         }
 

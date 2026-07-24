@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 class Ligase_Type_Service {
 
 	public function build(): ?array {
-		if ( ! is_page() ) {
+		if ( ! is_singular() ) {
 			return null;
 		}
 

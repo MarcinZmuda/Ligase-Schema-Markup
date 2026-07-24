@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.28
+Stable tag: 2.4.29
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,19 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.29 =
+**KRYTYCZNE: 11 typów schema było po cichu blokowanych na STRONACH (tylko wpisy).**
+
+FAQPage, HowTo, Course, Event, Review, QAPage, DefinedTerm, ClaimReview, SoftwareApplication, AudioObject i VideoObject sprawdzały kontekst przez `is_single()`, które jest **prawdziwe tylko dla wpisów** — na stronach (`page`) zwraca false. Efekt: włączałeś przełącznik np. "FAQPage" na stronie, wypełniałeś pola, a schema **nigdy się nie emitowała**, bez żadnego komunikatu.
+
+Co gorsza, generator **celowo** wywołuje te typy w kontekście strony (jego komentarz wprost wymienia Service / Event / FAQ / HowTo / Course jako opt-in per strona) — czyli intencja i bramka w typie były sprzeczne. Nowsze typy (Product, Recipe, JobPosting, DiscussionForumPosting, PodcastSeries) miały już poprawne `is_singular()`; starsze zostały na `is_single()`. Klasyczny dryf.
+
+Naprawione: wszystkie typy opcjonalne używają teraz `is_singular()` (wpisy + strony + własne typy treści). Dodatkowo Service miał ograniczenie odwrotne — `is_page()` blokowało go na wpisach i CPT — też ujednolicone do `is_singular()`.
+
+BlogPosting **celowo** zostaje na `is_single()`: strony dostają węzeł WebPage, nie BlogPosting.
+
+Jeśli masz strony z włączonym FAQ/HowTo/Course itd., które nie pokazywały schemy — po tej aktualizacji zaczną działać bez żadnych zmian w treści.
 
 = 2.4.28 =
 **UI dla Course (szkolenia/kursy) + czystszy węzeł Organization (koniec wiszących `employee`).**
