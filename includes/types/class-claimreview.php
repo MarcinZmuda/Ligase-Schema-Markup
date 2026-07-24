@@ -28,7 +28,7 @@ class Ligase_Type_ClaimReview {
     ];
 
     public function build(): ?array {
-        if ( ! is_single() ) {
+        if ( ! is_singular() ) {
             return null;
         }
 

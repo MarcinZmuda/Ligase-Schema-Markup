@@ -7,6 +7,13 @@ Wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 Pełne, szczegółowe release notes — w pliku [`readme.txt`](readme.txt) (WordPress format).
 
+## [2.4.29] - 2026-07-08
+
+### Naprawione (krytyczne)
+- **11 typów schema było blokowanych na stronach**: FAQPage, HowTo, Course, Event, Review, QAPage, DefinedTerm, ClaimReview, SoftwareApplication, AudioObject, VideoObject gated na `is_single()` (prawdziwe tylko dla wpisów) → włączony przełącznik na stronie nie emitował nic, po cichu. Generator **celowo** wywołuje te typy w kontekście strony, więc intencja i bramka były sprzeczne. Wszystkie → `is_singular()` (wpisy + strony + CPT).
+- **Service** miał ograniczenie odwrotne (`is_page()` blokowało wpisy i CPT) → też `is_singular()`.
+- BlogPosting celowo pozostaje na `is_single()` (strony dostają WebPage).
+
 ## [2.4.28] - 2026-07-08
 
 ### Dodane
