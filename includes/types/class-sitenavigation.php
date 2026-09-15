@@ -2,12 +2,12 @@
 /**
  * Ligase SiteNavigationElement Schema Type
  *
- * Generates ItemList-based SiteNavigationElement schema for the primary
- * WordPress navigation menu. Only top-level items are included — submenus
- * are skipped because Google cannot reliably resolve nested nav schemas.
+ * Generates SiteNavigationElement schema for the WordPress navigation menus.
+ * Only top-level items are included — submenus are skipped because Google
+ * cannot reliably resolve nested nav schemas.
  *
- * Output: one SiteNavigationElement per registered nav menu location,
- * each containing an ItemList of absolute URLs.
+ * Output: one SiteNavigationElement per distinct nav menu, each holding the
+ * menu's top-level items in `hasPart` with absolute URLs.
  *
  * Activation: auto — fires whenever at least one nav menu is registered
  * and has items assigned. No user configuration needed.
@@ -37,13 +37,25 @@ class Ligase_Type_SiteNavigationElement {
 		}
 
 		$schemas = array();
+		$seen    = array();
 
 		foreach ( $locations as $location => $menu_id ) {
+			$menu_id = (int) $menu_id;
+
 			if ( empty( $menu_id ) ) {
 				continue;
 			}
 
-			$schema = $this->build_for_menu( (int) $menu_id, $location );
+			// One node per MENU, not per location. Themes routinely assign the same
+			// menu to several locations (primary + mobile + offcanvas); emitting it
+			// once per location put byte-identical duplicates in the graph that the
+			// @id de-dupe in finalize_graph() could not collapse.
+			if ( isset( $seen[ $menu_id ] ) ) {
+				continue;
+			}
+			$seen[ $menu_id ] = true;
+
+			$schema = $this->build_for_menu( $menu_id, (string) $location );
 			if ( ! empty( $schema ) ) {
 				$schemas[] = $schema;
 			}
@@ -87,25 +99,16 @@ class Ligase_Type_SiteNavigationElement {
 		$position   = 1;
 
 		foreach ( $top_level as $item ) {
-			$url = esc_url( $item->url );
+			$url = $this->resolve_url( (string) $item->url );
 
-			// Skip empty, anchor-only, or javascript: links
-			if ( empty( $url )
-				|| str_starts_with( $item->url, '#' )
-				|| str_starts_with( $item->url, 'javascript:' )
-			) {
+			if ( $url === '' ) {
 				continue;
-			}
-
-			// Ensure absolute URL
-			if ( ! preg_match( '#^https?://#i', $url ) ) {
-				$url = home_url( $url );
 			}
 
 			$list_items[] = array(
 				'@type'    => 'SiteNavigationElement',
 				'position' => $position++,
-				'name'     => wp_strip_all_tags( $item->title ),
+				'name'     => $this->clean_text( (string) $item->title ),
 				'url'      => $url,
 			);
 		}
@@ -114,18 +117,79 @@ class Ligase_Type_SiteNavigationElement {
 			return null;
 		}
 
-		// Human-readable name for this navigation
-		$menu_obj = wp_get_nav_menu_object( $menu_id );
-		$nav_name = $menu_obj ? $menu_obj->name : $location;
-
 		$schema = array(
-			'@type'           => 'SiteNavigationElement',
-			'@id'             => home_url( '/#nav-' . sanitize_key( $location ) ),
-			'name'            => wp_strip_all_tags( $nav_name ),
-			'url'             => esc_url( home_url( '/' ) ),
-			'hasPart'         => $list_items,
+			'@type'   => 'SiteNavigationElement',
+			'@id'     => home_url( '/#nav-' . sanitize_key( $location ) ),
+			'name'    => $this->menu_name( $menu_id, $location ),
+			'url'     => esc_url_raw( home_url( '/' ) ),
+			'hasPart' => $list_items,
 		);
 
 		return apply_filters( 'ligase_site_navigation_element', $schema, $location, $menu_id );
+	}
+
+	/**
+	 * Turn a menu item URL into an absolute http(s) URL fit for JSON-LD.
+	 *
+	 * Returns '' for anything that shouldn't be published as a navigation
+	 * target: in-page anchors, javascript: pseudo-links, and non-web schemes
+	 * (mailto:, tel:, sms:). Those used to fall through the "is it absolute?"
+	 * test and get home_url()-prefixed, producing dead URLs in the graph
+	 * (https://example.com/mailto:biuro@example.com).
+	 *
+	 * Note esc_url_raw(), not esc_url(): esc_url() is an HTML-attribute escaper
+	 * and rewrites & into &#038;, which would land verbatim inside the JSON.
+	 */
+	private function resolve_url( string $raw ): string {
+		$raw = trim( $raw );
+
+		if ( $raw === '' || str_starts_with( $raw, '#' ) ) {
+			return '';
+		}
+
+		// Protocol-relative (//cdn.example.com/...) — adopt the site scheme.
+		if ( str_starts_with( $raw, '//' ) ) {
+			return (string) esc_url_raw( set_url_scheme( $raw ) );
+		}
+
+		// Already absolute http(s).
+		if ( preg_match( '#^https?://#i', $raw ) ) {
+			return (string) esc_url_raw( $raw );
+		}
+
+		// Any other scheme (mailto:, tel:, javascript:, ftp:) is not a page.
+		if ( preg_match( '#^[a-z][a-z0-9+.\-]*:#i', $raw ) ) {
+			return '';
+		}
+
+		return (string) esc_url_raw( home_url( $raw ) );
+	}
+
+	/**
+	 * Human-readable name for this navigation.
+	 *
+	 * Prefers the theme's registered label for the location ("Menu główne"),
+	 * because the WP menu object name is an editor-facing working title —
+	 * sites shipped nav schema named "nowe" or "menu 2 kopia" to Google.
+	 */
+	private function menu_name( int $menu_id, string $location ): string {
+		if ( function_exists( 'get_registered_nav_menus' ) ) {
+			$registered = get_registered_nav_menus();
+			if ( ! empty( $registered[ $location ] ) ) {
+				return $this->clean_text( (string) $registered[ $location ] );
+			}
+		}
+
+		$menu_obj = wp_get_nav_menu_object( $menu_id );
+
+		return $this->clean_text( $menu_obj ? (string) $menu_obj->name : $location );
+	}
+
+	/**
+	 * Strip tags and decode HTML entities — JSON-LD carries text, not markup,
+	 * so a title stored as "Cennik &#8211; 2026" must not reach Google that way.
+	 */
+	private function clean_text( string $text ): string {
+		return trim( html_entity_decode( wp_strip_all_tags( $text ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
 	}
 }

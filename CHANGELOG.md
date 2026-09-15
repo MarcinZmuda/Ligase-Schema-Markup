@@ -7,6 +7,23 @@ Wersjonowanie zgodne z [Semantic Versioning](https://semver.org/lang/pl/).
 
 Pełne, szczegółowe release notes — w pliku [`readme.txt`](readme.txt) (WordPress format).
 
+## [2.4.30] - 2026-09-15
+
+### Naprawione (krytyczne)
+- **Tryb samodzielny czyścił tylko JSON-LD — mikrodane motywu zostawały na stronie.** Scrubber (`Ligase_Suppressor`) przeglądał wyłącznie `<script type="application/ld+json">`, więc okruszki renderowane przez motyw jako mikrodane (`<div class="breadcrumbs" itemscope itemtype="https://schema.org/BreadcrumbList">`) przechodziły nietknięte i konkurowały z grafem Ligase. Takie okruszki są zwykle niekompletne — jeden `ListItem`, brak pola `position`, bieżąca strona nieoznaczona — a Search Console raportuje je jako **nieprawidłowy element** i odbiera stronie element rozszerzony, mimo że JSON-LD Ligase jest w pełni poprawny. Znalezione na egzaminyprawnicze.org: FAIL dokładnie na tych stronach, które miały mikrodane w szablonie.
+- Nowa opcja **„Usuwaj mikrodane motywu"** (`strip_microdata`, domyślnie włączona, działa tylko w trybie samodzielnym): na stronach zawierających mikrodane schema.org Ligase zdejmuje atrybuty `itemscope` / `itemtype` / `itemprop` / `itemid` / `itemref`. Treść, klasy i wygląd zostają bez zmian. Nietykane: strony bez mikrodanych, inne słowniki (np. data-vocabulary.org) oraz zawartość `<script>`, `<style>` i `<textarea>`. Wyłącznik per żądanie: filtr `ligase_strip_foreign_microdata`.
+- Gdy opcja jest wyłączona, a mikrodane są obecne, Ligase odnotowuje to i pokazuje **ostrzeżenie w panelu** z adresem strony.
+
+### Naprawione (SiteNavigationElement)
+- **`mailto:` i `tel:` w menu trafiały do schemy jako martwe adresy.** Test „czy URL jest absolutny" łapał tylko `http(s)://`, więc pozycja „Napisz" przechodziła przez `home_url()` i lądowała w grafie jako `https://domena.pl/mailto:biuro@domena.pl`. Adresy w innych schematach są teraz pomijane, protokolo-względne (`//host/...`) dostają schemat witryny, a `position` pozostaje ciągłe mimo pominięć.
+- **`esc_url()` → `esc_url_raw()`** w wartościach JSON-LD: `esc_url()` jest escaperem atrybutów HTML i zamienia `&` na `&#038;`, co lądowało w JSON-ie przy każdym linku z query stringiem.
+- **Encje HTML w tytułach pozycji menu** są dekodowane (`Cennik &#8211; 2026` → `Cennik – 2026`).
+- **Nazwa węzła**: brana z etykiety lokalizacji zarejestrowanej przez motyw, a nie z roboczej nazwy menu w panelu — witryny wysyłały do Google nawigację o nazwie „nowe".
+- **To samo menu w kilku lokalizacjach** (primary + mobile + offcanvas) dawało identyczne, zduplikowane węzły z różnym `@id`, których deduplikacja w `finalize_graph()` nie mogła scalić. Teraz jeden węzeł na menu.
+
+### Dodane
+- Testy jednostkowe scrubbera mikrodanych i typu SiteNavigationElement (14 przypadków).
+
 ## [2.4.29] - 2026-07-08
 
 ### Naprawione (krytyczne)

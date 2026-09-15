@@ -623,6 +623,58 @@ if ( ! defined( 'MINUTE_IN_SECONDS' ) ){ define( 'MINUTE_IN_SECONDS',60 ); }
 // Require plugin class files (only those that exist)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Stubs used by the standalone-mode scrubber and the navigation type
+// ---------------------------------------------------------------------------
+
+if ( ! defined( 'HOUR_IN_SECONDS' ) ) {
+	define( 'HOUR_IN_SECONDS', 3600 );
+}
+
+if ( ! function_exists( 'get_transient' ) ) {
+	function get_transient( string $key ): mixed {
+		return MockData::get( 'transient_' . $key, false );
+	}
+}
+
+if ( ! function_exists( 'set_transient' ) ) {
+	function set_transient( string $key, mixed $value, int $expiration = 0 ): bool {
+		MockData::set( 'transient_' . $key, $value );
+		return true;
+	}
+}
+
+if ( ! function_exists( 'set_url_scheme' ) ) {
+	function set_url_scheme( string $url, ?string $scheme = null ): string {
+		return preg_replace( '#^//#', 'https://', $url );
+	}
+}
+
+if ( ! function_exists( 'get_nav_menu_locations' ) ) {
+	function get_nav_menu_locations(): array {
+		return (array) MockData::get( 'nav_menu_locations', [] );
+	}
+}
+
+if ( ! function_exists( 'wp_get_nav_menu_items' ) ) {
+	function wp_get_nav_menu_items( int|string|object $menu ): array|false {
+		$items = MockData::get( 'nav_menu_items_' . $menu, null );
+		return $items === null ? false : (array) $items;
+	}
+}
+
+if ( ! function_exists( 'wp_get_nav_menu_object' ) ) {
+	function wp_get_nav_menu_object( int|string|object $menu ): object|false {
+		return MockData::get( 'nav_menu_object_' . $menu, false );
+	}
+}
+
+if ( ! function_exists( 'get_registered_nav_menus' ) ) {
+	function get_registered_nav_menus(): array {
+		return (array) MockData::get( 'registered_nav_menus', [] );
+	}
+}
+
 $ligase_class_files = [
 	LIGASE_DIR . 'includes/class-logger.php',
 	LIGASE_DIR . 'includes/class-cache.php',
@@ -637,6 +689,7 @@ $ligase_class_files = [
 	LIGASE_DIR . 'includes/types/class-person.php',
 	LIGASE_DIR . 'includes/types/class-website.php',
 	LIGASE_DIR . 'includes/types/class-breadcrumb.php',
+	LIGASE_DIR . 'includes/types/class-sitenavigation.php',
 	LIGASE_DIR . 'includes/types/class-faqpage.php',
 	LIGASE_DIR . 'includes/types/class-howto.php',
 	LIGASE_DIR . 'includes/types/class-videoobject.php',
