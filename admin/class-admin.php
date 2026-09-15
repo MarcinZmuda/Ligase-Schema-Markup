@@ -113,6 +113,7 @@ class Ligase_Admin {
 	 */
 	public function init() {
 		add_action( 'admin_menu', array( $this, 'register_menus' ) );
+		add_action( 'admin_notices', array( $this, 'notice_foreign_microdata' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'admin_init', array( 'Ligase_Settings', 'register' ) );
 		add_action( 'add_meta_boxes', array( $this, 'register_meta_box' ) );
@@ -121,6 +122,45 @@ class Ligase_Admin {
 		add_action( 'edit_user_profile', array( $this, 'render_author_fields' ) );
 		add_action( 'personal_options_update', array( $this, 'save_author_fields' ) );
 		add_action( 'edit_user_profile_update', array( $this, 'save_author_fields' ) );
+	}
+
+	/**
+	 * Warn when the theme ships its own schema.org microdata and Ligase is not
+	 * allowed to remove it.
+	 *
+	 * Theme breadcrumbs rendered as microdata are usually incomplete (a single
+	 * ListItem, no `position`), and Search Console reports that item as invalid —
+	 * blocking the rich result even though the Ligase JSON-LD graph is valid.
+	 * Only shown on Ligase screens, and only while the situation is live.
+	 *
+	 * @return void
+	 */
+	public function notice_foreign_microdata() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || strpos( (string) $screen->id, 'ligase' ) === false ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$opts = (array) get_option( 'ligase_options', array() );
+		if ( empty( $opts['standalone_mode'] ) || ! empty( $opts['strip_microdata'] ) ) {
+			return;
+		}
+
+		$flag = get_transient( 'ligase_foreign_microdata' );
+		if ( empty( $flag['url'] ) ) {
+			return;
+		}
+
+		printf(
+			'<div class="notice notice-warning"><p><strong>%s</strong> %s</p><p><code>%s</code></p></div>',
+			esc_html__( 'Ligase:', 'ligase' ),
+			esc_html__( 'motyw tej witryny wypisuje własne dane strukturalne w mikrodanych (itemscope/itemprop). Konkurują one z grafem Ligase i zwykle są niekompletne — Google raportuje wtedy nieprawidłowy element mimo poprawnego JSON-LD. Włącz opcję „Usuwaj mikrodane motywu" w zakładce Zachowanie.', 'ligase' ),
+			esc_html( (string) $flag['url'] )
+		);
 	}
 
 	// -------------------------------------------------------------------------

@@ -7,6 +7,9 @@ class Ligase_Suppressor {
     private array $suppressed = [];
     private static bool $is_active = false;
 
+    /** Transient holding the last front-end page seen with foreign schema.org microdata. */
+    const MICRODATA_FLAG = 'ligase_foreign_microdata';
+
     /**
      * Known SEO plugins and their schema output filters.
      * Updated dynamically via get_active_seo_plugins().
@@ -262,7 +265,20 @@ class Ligase_Suppressor {
         if ( is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || is_feed() ) {
             return;
         }
-        ob_start( array( __CLASS__, 'dedupe_breadcrumb_jsonld' ) );
+        ob_start( array( __CLASS__, 'scrub_foreign_schema' ) );
+    }
+
+    /**
+     * Output-buffer callback: run every scrubbing pass over the rendered page.
+     *
+     * JSON-LD first (cheap, targeted), microdata second (only when the page
+     * actually carries schema.org microdata).
+     */
+    public static function scrub_foreign_schema( string $html ): string {
+        $html = self::dedupe_breadcrumb_jsonld( $html );
+        $html = self::strip_foreign_microdata( $html );
+
+        return $html;
     }
 
     /**
@@ -313,5 +329,145 @@ class Ligase_Suppressor {
             // Untyped or unrecognised node — leave alone (safer than over-stripping).
             return $m[0];
         }, $html );
+    }
+
+    /**
+     * Strip foreign schema.org MICRODATA from the rendered page.
+     *
+     * The JSON-LD scrubber above only ever saw `<script type="application/ld+json">`.
+     * Themes that render breadcrumbs (or products, or reviews) as inline microdata —
+     * `<div class="breadcrumbs" itemscope itemtype="https://schema.org/BreadcrumbList">` —
+     * sailed straight through it, so a site running standalone_mode still shipped a
+     * second, competing structured-data source that Ligase had no control over.
+     *
+     * Those theme breadcrumbs are usually half-finished (one ListItem, no `position`,
+     * current page not marked up at all), which Search Console reports as an invalid
+     * item and which costs the page its rich result even though the Ligase graph is
+     * perfectly valid.
+     *
+     * Contract: in standalone_mode the user has declared Ligase the single source of
+     * structured data, so on any page that carries schema.org microdata we remove the
+     * microdata attributes wholesale — itemscope/itemtype/itemprop/itemid/itemref.
+     * Visible markup, classes and text are untouched; only the machine-readable layer
+     * goes. All-or-nothing per page is deliberate: leaving descendant `itemprop`s
+     * behind (they carry no type of their own) would produce exactly the orphaned
+     * half-items we're trying to get rid of.
+     *
+     * Not touched: pages without schema.org microdata, other vocabularies
+     * (data-vocabulary.org and friends), and the contents of script/style/textarea.
+     *
+     * Opt out per site with the `strip_microdata` setting, or per request with the
+     * `ligase_strip_foreign_microdata` filter.
+     */
+    public static function strip_foreign_microdata( string $html ): string {
+        $opts = (array) get_option( 'ligase_options', array() );
+        // Default ON: an install that never saw this setting still gets the fix.
+        $enabled = ! array_key_exists( 'strip_microdata', $opts ) || ! empty( $opts['strip_microdata'] );
+
+        $enabled = (bool) apply_filters( 'ligase_strip_foreign_microdata', $enabled );
+
+        // Cheap early exits — most pages carry no microdata at all.
+        if ( stripos( $html, 'itemtype' ) === false ) {
+            return $html;
+        }
+        if ( ! preg_match( '#itemtype=["\']\s*https?://schema\.org/#i', $html ) ) {
+            return $html;
+        }
+
+        if ( ! $enabled ) {
+            // Stripping is off, but the competing markup is real — leave a flag for the
+            // admin notice, so the owner learns why Search Console keeps reporting an
+            // invalid item on a page whose JSON-LD is perfectly fine.
+            self::flag_foreign_microdata();
+
+            return $html;
+        }
+
+        // Keep script/style/textarea bodies verbatim — markup quoted inside JS or a
+        // form field is content, not structured data.
+        $parts = preg_split(
+            '#(<(?:script|style|textarea)\b[^>]*>.*?</(?:script|style|textarea)>)#is',
+            $html,
+            -1,
+            PREG_SPLIT_DELIM_CAPTURE
+        );
+
+        if ( ! is_array( $parts ) ) {
+            return $html;
+        }
+
+        foreach ( $parts as $i => $part ) {
+            if ( $i % 2 === 1 ) {
+                continue; // captured script/style/textarea block
+            }
+            $parts[ $i ] = self::strip_microdata_attributes( (string) $part );
+        }
+
+        return implode( '', $parts );
+    }
+
+    /**
+     * Remove microdata attributes from every start tag in one HTML chunk.
+     *
+     * A tag whose itemtype points at a non-schema.org vocabulary is left entirely
+     * alone, attributes and all.
+     */
+    private static function strip_microdata_attributes( string $chunk ): string {
+        if ( stripos( $chunk, 'item' ) === false ) {
+            return $chunk;
+        }
+
+        $out = preg_replace_callback(
+            '#<[a-z][a-z0-9:-]*\b[^>]*>#i',
+            static function ( array $m ): string {
+                $tag = $m[0];
+
+                if ( ! preg_match( '#\sitem(?:scope|type|prop|id|ref)\b#i', $tag ) ) {
+                    return $tag;
+                }
+
+                // Foreign vocabulary — not ours to clean up.
+                if ( preg_match( '#\sitemtype=(["\'])(.*?)\1#i', $tag, $t )
+                    && ! preg_match( '#^\s*https?://schema\.org/#i', $t[2] ) ) {
+                    return $tag;
+                }
+
+                // Quoted values first, then bare ones (itemprop=name).
+                $tag = (string) preg_replace( '#\sitem(?:type|prop|id|ref)=(["\']).*?\1#i', '', $tag );
+                $tag = (string) preg_replace( '#\sitem(?:type|prop|id|ref)=[^\s>]+#i', '', $tag );
+                $tag = (string) preg_replace( '#\sitemscope(?:=(["\'])[^"\']*\1)?(?=[\s/>])#i', '', $tag );
+
+                return $tag;
+            },
+            $chunk
+        );
+
+        // preg_replace_callback returns null on backtrack limit — keep the original.
+        return is_string( $out ) ? $out : $chunk;
+    }
+
+    /**
+     * Record that a front-end page carries foreign schema.org microdata.
+     *
+     * Throttled to one write per hour, and only reached when stripping is switched
+     * off — the hot path for every other site stays free of DB writes.
+     */
+    private static function flag_foreign_microdata(): void {
+        if ( get_transient( self::MICRODATA_FLAG ) ) {
+            return;
+        }
+
+        // $wp->request is the path relative to the site root — right on subdirectory
+        // installs too, where REQUEST_URI would double the prefix.
+        $request = isset( $GLOBALS['wp']->request ) ? (string) $GLOBALS['wp']->request : '';
+
+        set_transient(
+            self::MICRODATA_FLAG,
+            array(
+                'url'  => home_url( $request === '' ? '/' : '/' . ltrim( $request, '/' ) ),
+                'time' => time(),
+            ),
+            HOUR_IN_SECONDS
+        );
     }
 }

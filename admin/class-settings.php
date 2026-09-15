@@ -96,6 +96,7 @@ class Ligase_Settings {
 		self::add_field( 'default_schema_type', __( 'Domyślny typ schema dla postów', 'ligase' ), self::SECTION_BEHAVIOR, 'schema_type_select' );
 		self::add_field( 'speakable_selectors', __( 'Selektory CSS (Speakable)', 'ligase' ), self::SECTION_BEHAVIOR, 'text' );
 		self::add_field( 'standalone_mode', __( 'Tryb samodzielny (standalone)', 'ligase' ), self::SECTION_BEHAVIOR, 'checkbox' );
+		self::add_field( 'strip_microdata', __( 'Usuwaj mikrodane motywu', 'ligase' ), self::SECTION_BEHAVIOR, 'checkbox' );
 		self::add_field( 'force_output', __( 'Wymuszaj generowanie schema', 'ligase' ), self::SECTION_BEHAVIOR, 'checkbox' );
 		self::add_field( 'debug_mode', __( 'Tryb debugowania', 'ligase' ), self::SECTION_BEHAVIOR, 'checkbox' );
 
@@ -507,6 +508,7 @@ class Ligase_Settings {
 			'social_youtube'   => __( 'URL kanału YouTube. np. https://www.youtube.com/@acmepl', 'ligase' ),
 			// Behavior
 			'standalone_mode' => __( 'Aktywuj jeśli masz już Yoast/RankMath i chcesz zastąpić ich schema lepszym markupem Ligase. Ligase wyłączy schema innych wtyczek i przejmie output.', 'ligase' ),
+			'strip_microdata' => __( 'Działa tylko w trybie samodzielnym. Motywy często renderują okruszki, produkty czy opinie jako mikrodane w HTML (itemscope/itemprop). Te znaczniki są zwykle niekompletne (np. okruszki bez pola position) i Google raportuje je jako nieprawidłowy element, mimo poprawnego JSON-LD Ligase. Ta opcja usuwa same atrybuty mikrodanych — wygląd strony i treść zostają bez zmian. Wyłącz, jeśli motyw używa selektorów [itemprop] w CSS albo JS.', 'ligase' ),
 			'force_output'    => __( 'Generuj schema nawet gdy wykryto inne wtyczki SEO. Użyj gdy Ligase i np. Yoast mają nie pokrywające się typy schema (np. Yoast robi Article, Ligase dodaje FAQPage).', 'ligase' ),
 			'debug_mode'      => __( 'Loguje wszystkie operacje schema do pliku /wp-content/uploads/ligase-logs/. Nie włączaj na produkcji — spowalnia i zajmuje miejsce.', 'ligase' ),
 			'speakable_selectors' => __( 'Selektory CSS sekcji które AI i asystenci głosowi powinni cytować. Sprawdź klasę kontenera treści swojego motywu (F12 → Inspect element). Zostaw puste aby wyłączyć Speakable.', 'ligase' ),
@@ -577,6 +579,7 @@ class Ligase_Settings {
 
 		$descriptions = array(
 			'standalone_mode' => __( 'Aktywuj jeśli chcesz zastąpić schema z Yoast/RankMath. Ligase wyłączy ich output i przejmie całe JSON-LD.', 'ligase' ),
+			'strip_microdata' => __( 'Usuwa atrybuty mikrodanych (itemscope/itemprop) z HTML motywu, żeby niekompletne okruszki motywu nie konkurowały z JSON-LD Ligase. Tylko w trybie samodzielnym.', 'ligase' ),
 			'force_output'    => __( 'Generuj schema równolegle z innymi wtyczkami SEO. Użyj gdy mają nie pokrywające się typy (np. Yoast robi Article, Ligase dodaje FAQPage).', 'ligase' ),
 			'debug_mode'      => __( 'Loguje operacje do pliku. Nie włączaj na produkcji.', 'ligase' ),
 			'lb_service_area' => __( 'Włącz dla firm bez stałej siedziby: agencje online, kurierzy, serwisanci. Ligase użyje pola "Area served" zamiast adresu.', 'ligase' ),
@@ -684,6 +687,7 @@ class Ligase_Settings {
 		// org_author_mode / lb_service_area / health_report_enabled.
 		foreach ( array(
 			'standalone_mode',
+			'strip_microdata',
 			'force_output',
 			'debug_mode',
 			'store_mode',
@@ -777,6 +781,7 @@ class Ligase_Settings {
 			'social_youtube'   => '',
 			// Behavior
 			'standalone_mode'     => '',
+			'strip_microdata'     => '1',
 			'force_output'        => '',
 			'debug_mode'          => '',
 			'speakable_selectors' => '',

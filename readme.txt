@@ -4,7 +4,7 @@ Tags: schema, json-ld, seo, structured data, rich results, ai search, schema.org
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.4.29
+Stable tag: 2.4.30
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -128,6 +128,17 @@ Ligase does not collect, store, or transmit any personal data about your site vi
 When you enable external NER providers, post content is transmitted to the chosen provider. Read the relevant provider's privacy policy above before enabling.
 
 == Changelog ==
+
+= 2.4.30 =
+**Tryb samodzielny sprzątał tylko JSON-LD — mikrodane motywu konkurowały z grafem Ligase.**
+
+Scrubber trybu samodzielnego przeglądał wyłącznie bloki `<script type="application/ld+json">`. Motywy, które renderują okruszki (albo produkty czy opinie) jako mikrodane w HTML — `<div class="breadcrumbs" itemscope itemtype="https://schema.org/BreadcrumbList">` — przechodziły przez niego bez zmian. Efekt: witryna w trybie samodzielnym nadal miała drugie, niezależne źródło danych strukturalnych.
+
+Takie okruszki motywu są prawie zawsze niedokończone: jeden `ListItem`, brak pola `position`, bieżąca strona w ogóle nieoznaczona. Google raportuje wtedy **nieprawidłowy element** i nie przyznaje elementu rozszerzonego — mimo że JSON-LD z Ligase jest poprawny. Diagnoza jest myląca, bo w JSON-LD wszystko wygląda dobrze.
+
+Nowa opcja **„Usuwaj mikrodane motywu"** (Ustawienia → Zachowanie, domyślnie włączona, działa tylko w trybie samodzielnym) zdejmuje atrybuty mikrodanych (`itemscope`, `itemtype`, `itemprop`, `itemid`, `itemref`) ze stron, które zawierają mikrodane schema.org. Wygląd, treść i klasy CSS zostają nietknięte — znika tylko warstwa maszynowa. Nietykane: strony bez mikrodanych, inne słowniki niż schema.org oraz zawartość `<script>`, `<style>` i `<textarea>`. Wyłącz opcję, jeśli motyw stylizuje po selektorach `[itemprop]`; per żądanie działa filtr `ligase_strip_foreign_microdata`.
+
+**SiteNavigationElement — pięć poprawek.** Pozycje menu z `mailto:` i `tel:` trafiały do schemy jako martwe adresy (`https://domena.pl/mailto:biuro@domena.pl`), bo test na adres absolutny łapał tylko `http(s)://`. URL-e szły przez `esc_url()`, czyli escaper atrybutów HTML, który zamienia `&` na `&#038;` — w JSON-ie to błąd. Encje HTML w tytułach (`Cennik &#8211; 2026`) nie były dekodowane. Nazwa nawigacji brała się z roboczej nazwy menu w panelu, więc witryny wysyłały do Google menu o nazwie „nowe". To samo menu przypięte do kilku lokalizacji dawało zduplikowane węzły.
 
 = 2.4.29 =
 **KRYTYCZNE: 11 typów schema było po cichu blokowanych na STRONACH (tylko wpisy).**
